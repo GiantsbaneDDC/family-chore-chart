@@ -308,11 +308,9 @@ body {
   }
 }
 
-@media (min-width: 1400px) {
+@media (min-width: 1200px) {
   .kiosk-container {
     padding: 32px 48px;
-    max-width: 1600px;
-    margin: 0 auto;
   }
 }
 
@@ -654,30 +652,40 @@ body {
 @media (min-width: 768px) {
   .kid-container {
     padding: 32px;
-    max-width: 900px;
-    margin: 0 auto;
   }
 }
 
 @media (min-width: 1200px) {
   .kid-container {
-    max-width: 1100px;
-    padding: 40px;
+    padding: 40px 48px;
   }
 }
 
-/* Desktop 2-column grid for kid's day sections */
+/* Responsive grid for kid's day sections - adapts to screen width */
 .kid-days-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 16px;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 768px) {
   .kid-days-grid {
-    display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 24px;
+  }
+}
+
+@media (min-width: 1400px) {
+  .kid-days-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+  }
+}
+
+@media (min-width: 1800px) {
+  .kid-days-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
   }
 }
 
@@ -851,9 +859,13 @@ body {
 
 @media (min-width: 768px) {
   .admin-container {
-    padding: 24px;
-    max-width: 1200px;
-    margin: 0 auto;
+    padding: 24px 32px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .admin-container {
+    padding: 32px 48px;
   }
 }
 
