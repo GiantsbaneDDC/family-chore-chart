@@ -1,0 +1,97 @@
+import axios from 'axios';
+import type { FamilyMember, Chore, Assignment, KioskData, StreakData, PointsData, Completion } from './types';
+
+const api = axios.create({
+  baseURL: '/api',
+  withCredentials: true,
+});
+
+// Family Members
+export const getMembers = () => api.get<FamilyMember[]>('/members').then(r => r.data);
+export const getMember = (id: number) => api.get<FamilyMember>(`/members/${id}`).then(r => r.data);
+export const createMember = (data: { name: string; color: string; avatar: string; pin: string }) => 
+  api.post<FamilyMember>('/members', data).then(r => r.data);
+export const updateMember = (id: number, data: { name: string; color: string; avatar: string; pin?: string }) => 
+  api.put<FamilyMember>(`/members/${id}`, data).then(r => r.data);
+export const deleteMember = (id: number) => api.delete(`/members/${id}`);
+export const verifyMemberPin = (id: number, pin: string) => 
+  api.post<FamilyMember>(`/members/${id}/verify-pin`, { pin }).then(r => r.data);
+
+// Chores
+export const getChores = () => api.get<Chore[]>('/chores').then(r => r.data);
+export const createChore = (data: { title: string; icon: string; points: number; money_value?: number | null }) => 
+  api.post<Chore>('/chores', data).then(r => r.data);
+export const updateChore = (id: number, data: { title: string; icon: string; points: number; money_value?: number | null }) => 
+  api.put<Chore>(`/chores/${id}`, data).then(r => r.data);
+export const deleteChore = (id: number) => api.delete(`/chores/${id}`);
+
+// Assignments
+export const getAssignments = () => api.get<Assignment[]>('/assignments').then(r => r.data);
+export const getMemberAssignments = (memberId: number) => 
+  api.get<Assignment[]>(`/assignments/member/${memberId}`).then(r => r.data);
+export const createAssignment = (data: { chore_id: number; member_id: number; day_of_week: number }) => 
+  api.post<Assignment>('/assignments', data).then(r => r.data);
+export const deleteAssignment = (id: number) => api.delete(`/assignments/${id}`);
+export const updateMemberAssignments = (memberId: number, assignments: { chore_id: number; day_of_week: number }[]) => 
+  api.put(`/assignments/member/${memberId}`, { assignments });
+
+// Completions
+export const getCompletions = (weekStart?: string) => 
+  api.get<Completion[]>('/completions', { params: { week_start: weekStart } }).then(r => r.data);
+export const getMemberCompletions = (memberId: number, weekStart?: string) => 
+  api.get<Completion[]>(`/completions/member/${memberId}`, { params: { week_start: weekStart } }).then(r => r.data);
+export const toggleCompletion = (assignmentId: number, weekStart?: string) => 
+  api.post<{ completed: boolean; moneyEarned?: number }>('/completions/toggle', { assignment_id: assignmentId, week_start: weekStart }).then(r => r.data);
+export const markComplete = (assignmentId: number, weekStart?: string) => 
+  api.post('/completions', { assignment_id: assignmentId, week_start: weekStart });
+
+// Kiosk
+export const getKioskData = (weekStart?: string) => 
+  api.get<KioskData>('/kiosk', { params: { week_start: weekStart } }).then(r => r.data);
+
+// Stats
+export const getMemberStreak = (memberId: number) => 
+  api.get<StreakData>(`/stats/streak/${memberId}`).then(r => r.data);
+export const getPoints = (weekStart?: string) => 
+  api.get<PointsData[]>('/stats/points', { params: { week_start: weekStart } }).then(r => r.data);
+export const getHistory = (weeks?: number) => 
+  api.get('/stats/history', { params: { weeks } }).then(r => r.data);
+
+// Admin
+export const verifyAdmin = (pin: string) => api.post('/admin/verify', { pin }).then(r => r.data);
+export const getAdminStatus = () => api.get<{ isAdmin: boolean }>('/admin/status').then(r => r.data);
+export const logoutAdmin = () => api.post('/admin/logout');
+export const changeAdminPin = (pin: string) => api.put('/admin/pin', { pin });
+
+// Analytics
+export const logAnalyticsEvent = (eventType: string, memberId?: number, metadata?: Record<string, unknown>) => 
+  api.post('/analytics/event', { event_type: eventType, member_id: memberId, metadata });
+export const getAnalyticsSummary = (weekStart?: string) => 
+  api.get('/analytics/summary', { params: { week_start: weekStart } }).then(r => r.data);
+
+// Achievements
+import type { Achievement, MemberAchievement, RewardsData } from './types';
+export const getAchievements = () => api.get<Achievement[]>('/achievements').then(r => r.data);
+export const getMemberAchievements = (memberId: number) => 
+  api.get<MemberAchievement[]>(`/achievements/member/${memberId}`).then(r => r.data);
+export const checkAchievements = (memberId: number) => 
+  api.post<{ awarded: string[] }>(`/achievements/check/${memberId}`).then(r => r.data);
+
+// Rewards
+export const getRewardsData = (weekStart?: string) => 
+  api.get<RewardsData>('/rewards', { params: { week_start: weekStart } }).then(r => r.data);
+
+// Allowance Settings
+export const getAllowanceSettings = () => 
+  api.get<{ enabled: boolean; jarMax: number }>('/settings/allowance').then(r => r.data);
+export const updateAllowanceSettings = (data: { enabled?: boolean; jarMax?: number }) => 
+  api.put('/settings/allowance', data).then(r => r.data);
+
+// Allowance
+export const getMemberAllowance = (memberId: number) => 
+  api.get<{ balance: number; history: AllowanceHistoryEntry[] }>(`/allowance/${memberId}`).then(r => r.data);
+export const recordPayout = (memberId: number, amount: number, description?: string) => 
+  api.post<{ success: boolean; newBalance: number }>(`/allowance/${memberId}/payout`, { amount, description }).then(r => r.data);
+
+// Types for allowance
+import type { AllowanceHistoryEntry } from './types';

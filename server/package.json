@@ -1,0 +1,18 @@
+{
+  "name": "chore-chart-server",
+  "version": "1.0.0",
+  "description": "Family Chore Chart Backend",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "setup-db": "sudo -u postgres psql -f setup-db.sql"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "pg": "^8.11.3"
+  }
+}
