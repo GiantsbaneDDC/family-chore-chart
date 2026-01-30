@@ -465,7 +465,7 @@ export default function KidView() {
       )}
 
       {/* Chores by Day - sorted so today is first */}
-      <Stack gap="lg">
+      <div className="kid-days-grid">
         {[...Array(7)].map((_, i) => {
           // Start from today and wrap around
           const dayIndex = (today + i) % 7;
@@ -560,7 +560,7 @@ export default function KidView() {
             </div>
           );
         })}
-      </Stack>
+      </div>
 
       {assignments.length === 0 && (
         <Center py={80}>

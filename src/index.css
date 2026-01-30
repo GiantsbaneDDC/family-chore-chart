@@ -304,7 +304,15 @@ body {
 
 @media (min-width: 768px) {
   .kiosk-container {
-    padding: 24px;
+    padding: 24px 32px;
+  }
+}
+
+@media (min-width: 1400px) {
+  .kiosk-container {
+    padding: 32px 48px;
+    max-width: 1600px;
+    margin: 0 auto;
   }
 }
 
@@ -313,13 +321,22 @@ body {
    ============================================ */
 .swim-lane-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 8px;
+  border-collapse: collapse;
   table-layout: fixed;
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+}
+
+.swim-lane-table thead {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 2px solid var(--border-color);
 }
 
 .swim-lane-table th {
-  padding: 16px 8px;
+  padding: 20px 12px;
   text-align: center;
   font-weight: 800;
   font-size: 13px;
@@ -327,22 +344,56 @@ body {
   letter-spacing: 0.5px;
   color: var(--text-secondary);
   vertical-align: bottom;
+  border-right: 1px solid var(--border-color);
+}
+
+.swim-lane-table th:last-child {
+  border-right: none;
+}
+
+.swim-lane-table th:first-child {
+  text-align: left;
+  padding-left: 20px;
+  background: linear-gradient(135deg, #e2e8f0 0%, #e2e8f0 100%);
+}
+
+.swim-lane-table tbody tr {
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.2s ease;
+}
+
+.swim-lane-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.swim-lane-table tbody tr:hover {
+  background: rgba(59, 130, 246, 0.03);
 }
 
 .swim-lane-table td {
-  padding: 0;
+  padding: 12px;
   vertical-align: top;
+  border-right: 1px solid var(--border-color);
+}
+
+.swim-lane-table td:last-child {
+  border-right: none;
+}
+
+.swim-lane-table td:first-child {
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+  border-right: 2px solid var(--border-color);
 }
 
 .swim-lane-table th:first-child,
 .swim-lane-table td:first-child {
-  width: 160px;
+  width: 180px;
 }
 
 @media (min-width: 1200px) {
   .swim-lane-table th:first-child,
   .swim-lane-table td:first-child {
-    width: 200px;
+    width: 220px;
   }
 }
 
@@ -352,6 +403,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  padding: 4px;
 }
 
 .day-header-today {
@@ -359,7 +411,7 @@ body {
   color: white !important;
   border-radius: var(--radius-md);
   padding: 12px 8px;
-  margin: -8px;
+  margin: -12px;
   box-shadow: var(--shadow-md);
 }
 
@@ -371,41 +423,27 @@ body {
 .member-cell {
   background: var(--bg-primary);
   border-radius: var(--radius-lg);
-  padding: 16px;
+  padding: 14px;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-color);
   position: relative;
   overflow: hidden;
-}
-
-.member-cell::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 5px;
-}
-
-/* Swim lane cell */
-.swim-cell {
-  background: var(--bg-primary);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  min-height: 100px;
-  box-shadow: var(--shadow-xs);
-  border: 1px solid var(--border-color);
   transition: all 0.2s ease;
 }
 
-.swim-cell:hover {
-  box-shadow: var(--shadow-sm);
+.member-cell:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Swim lane cell - now inside table cells */
+.swim-cell {
+  min-height: 80px;
+  transition: all 0.2s ease;
 }
 
 .swim-cell-today {
   background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  border-color: #93c5fd;
-  box-shadow: var(--shadow-sm);
 }
 
 /* Chore item in cell */
@@ -615,9 +653,31 @@ body {
 
 @media (min-width: 768px) {
   .kid-container {
-    padding: 24px;
-    max-width: 700px;
+    padding: 32px;
+    max-width: 900px;
     margin: 0 auto;
+  }
+}
+
+@media (min-width: 1200px) {
+  .kid-container {
+    max-width: 1100px;
+    padding: 40px;
+  }
+}
+
+/* Desktop 2-column grid for kid's day sections */
+.kid-days-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 900px) {
+  .kid-days-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
   }
 }
 
@@ -684,7 +744,6 @@ body {
 .kid-day-section {
   background: var(--bg-primary);
   border-radius: var(--radius-xl);
-  margin-bottom: 16px;
   overflow: hidden;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border-color);

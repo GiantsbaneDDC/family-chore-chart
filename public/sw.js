@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chore-chart-v3';
+const CACHE_NAME = 'chore-chart-v5';
 const urlsToCache = [
   '/',
   '/index.html'
