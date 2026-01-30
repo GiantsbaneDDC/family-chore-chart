@@ -299,7 +299,7 @@ export default function KioskView() {
           </Box>
 
           {/* Desktop Table View */}
-          <Box style={{ overflowX: 'auto' }} visibleFrom="sm">
+          <Box className="kiosk-table-wrapper" visibleFrom="sm">
             <table className="swim-lane-table">
               <thead>
                 <tr>
@@ -509,13 +509,14 @@ export default function KioskView() {
             </Stack>
           </Box>
 
-          {/* Quick Access Avatars - desktop only */}
+          {/* Quick Access Avatars - tablets only, hidden on large screens for no-scroll */}
           <Paper 
             p="md" 
             radius="xl" 
             mt="xl" 
             shadow="sm"
             visibleFrom="sm"
+            hiddenFrom="lg"
             style={{ background: 'linear-gradient(135deg, #f0f9ff 0%, #fdf4ff 50%, #fef3c7 100%)' }}
           >
             <Text ta="center" fw={700} c="dimmed" size="sm" mb="md">

@@ -305,6 +305,10 @@ body {
 @media (min-width: 768px) {
   .kiosk-container {
     padding: 24px 32px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 }
 
@@ -312,6 +316,21 @@ body {
   .kiosk-container {
     padding: 32px 48px;
   }
+}
+
+/* Desktop kiosk layout - no scroll */
+.kiosk-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.kiosk-table-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* ============================================
@@ -326,6 +345,30 @@ body {
   overflow: hidden;
   box-shadow: var(--shadow-md);
   border: 1px solid var(--border-color);
+}
+
+/* Compact mode for fitting on screen */
+@media (min-width: 768px) {
+  .swim-lane-table {
+    font-size: 14px;
+  }
+  
+  .swim-lane-table th {
+    padding: 12px 8px;
+  }
+  
+  .swim-lane-table td {
+    padding: 8px;
+  }
+  
+  .chore-item {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  
+  .chore-item span:first-child {
+    font-size: 1.25rem;
+  }
 }
 
 .swim-lane-table thead {
@@ -436,8 +479,14 @@ body {
 
 /* Swim lane cell - now inside table cells */
 .swim-cell {
-  min-height: 80px;
+  min-height: 60px;
   transition: all 0.2s ease;
+}
+
+@media (min-width: 768px) {
+  .swim-cell {
+    min-height: auto;
+  }
 }
 
 .swim-cell-today {
