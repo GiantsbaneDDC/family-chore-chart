@@ -120,6 +120,7 @@ export default function RewardsView() {
         </Group>
       </Paper>
 
+      <div className="rewards-content">
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="xl">
         {/* Weekly Leaderboard */}
         <Paper 
@@ -522,6 +523,7 @@ export default function RewardsView() {
           </SimpleGrid>
         </Paper>
       </SimpleGrid>
+      </div>
 
       <style>{`
         .pulse-on-hover:hover {

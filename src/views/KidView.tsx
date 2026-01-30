@@ -574,8 +574,8 @@ export default function KidView() {
         </Center>
       )}
 
-      {/* Back button at bottom */}
-      <Center mt="xl" pb="xl">
+      {/* Back button at bottom - mobile only, desktop has top button */}
+      <Center mt="xl" pb="xl" hiddenFrom="sm">
         <Button
           component={Link}
           to="/"
