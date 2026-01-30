@@ -23,6 +23,7 @@ import dayjs from 'dayjs';
 import * as api from '../api';
 import type { FamilyMember, Assignment, Completion, StreakData } from '../types';
 import { DAYS } from '../types';
+import { FitToScreen } from '../components/FitToScreen';
 
 // Money Jar Component
 function MoneyJar({ balance, max, color }: { balance: number; max: number; color: string }) {
@@ -306,10 +307,16 @@ export default function KidView() {
     : 100;
 
   return (
+    <FitToScreen
+      baseWidth={1400}
+      baseHeight={900}
+      background={`linear-gradient(180deg, ${member.color}15 0%, ${member.color}05 30%, white 100%)`}
+      padding={24}
+    >
     <Box 
       className="kid-container safe-area-padding"
       style={{ 
-        background: `linear-gradient(180deg, ${member.color}15 0%, ${member.color}05 30%, white 100%)` 
+        background: 'transparent' 
       }}
     >
       {/* Coin popup animation */}
@@ -589,5 +596,6 @@ export default function KidView() {
         </Button>
       </Center>
     </Box>
+    </FitToScreen>
   );
 }

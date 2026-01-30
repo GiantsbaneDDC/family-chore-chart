@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/api.ts","./src/main.tsx","./src/types.ts","./src/views/AdminView.tsx","./src/views/KidView.tsx","./src/views/KioskView.tsx","./src/views/PinEntry.tsx","./src/views/RewardsView.tsx"],"version":"5.9.3"}
+{"root":["./src/App.tsx","./src/api.ts","./src/main.tsx","./src/types.ts","./src/components/FitToScreen.tsx","./src/views/AdminView.tsx","./src/views/KidView.tsx","./src/views/KioskView.tsx","./src/views/PinEntry.tsx","./src/views/RewardsView.tsx"],"version":"5.9.3"}

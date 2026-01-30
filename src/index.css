@@ -304,44 +304,21 @@ body {
 
 @media (min-width: 768px) {
   .kiosk-container {
-    padding: clamp(16px, 2vh, 32px) clamp(24px, 3vw, 48px);
-    height: 100vh;
-    overflow: hidden;
+    /* Fixed size container - gets scaled by FitToScreen */
+    width: 100%;
+    height: 100%;
+    padding: 24px;
     display: flex;
     flex-direction: column;
-  }
-  
-  .kiosk-container .mantine-Title-root {
-    font-size: clamp(1.2rem, 2.5vw, 1.8rem) !important;
-  }
-  
-  .kiosk-container .mantine-Paper-root {
-    padding: clamp(12px, 1.5vh, 24px) !important;
-    margin-bottom: clamp(12px, 1.5vh, 24px) !important;
+    overflow: hidden;
   }
 }
 
-/* Desktop kiosk layout - no scroll */
+/* Desktop kiosk layout */
 .kiosk-table-wrapper {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.kiosk-table-wrapper .swim-lane-table {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.kiosk-table-wrapper .swim-lane-table tbody {
-  flex: 1;
-}
-
-.kiosk-table-wrapper .swim-lane-table tr {
-  display: table-row;
 }
 
 /* ============================================
@@ -358,39 +335,31 @@ body {
   border: 1px solid var(--border-color);
 }
 
-/* Viewport-responsive sizing for fitting on screen */
+/* Desktop table sizing - fixed size, scaled by container */
 @media (min-width: 768px) {
   .swim-lane-table {
-    font-size: clamp(11px, 1.2vw, 14px);
+    font-size: 13px;
   }
   
   .swim-lane-table th {
-    padding: clamp(8px, 1vh, 16px) clamp(4px, 0.5vw, 12px);
+    padding: 12px 8px;
   }
   
   .swim-lane-table td {
-    padding: clamp(6px, 0.8vh, 12px);
+    padding: 8px;
   }
   
   .chore-item {
-    padding: clamp(6px, 0.8vh, 12px) clamp(8px, 1vw, 14px);
-    gap: clamp(4px, 0.5vw, 8px);
+    padding: 8px 10px;
+    gap: 6px;
   }
   
   .chore-item span:first-child {
-    font-size: clamp(1rem, 1.5vw, 1.5rem);
+    font-size: 1.2rem;
   }
   
   .member-cell {
-    padding: clamp(8px, 1vh, 16px);
-  }
-  
-  .member-cell .mantine-Text-root {
-    font-size: clamp(0.75rem, 1.2vw, 1rem);
-  }
-  
-  .day-header .mantine-Text-root {
-    font-size: clamp(0.9rem, 1.3vw, 1.2rem) !important;
+    padding: 12px;
   }
 }
 
@@ -723,29 +692,17 @@ body {
 
 @media (min-width: 768px) {
   .kid-container {
-    padding: clamp(16px, 2vh, 32px) clamp(24px, 3vw, 48px);
-    padding-bottom: clamp(24px, 3vh, 48px);
-    height: 100vh;
-    overflow: hidden;
+    /* Fixed size - scaled by FitToScreen */
+    width: 100%;
+    height: 100%;
+    padding: 24px;
     display: flex;
     flex-direction: column;
-  }
-  
-  .kid-container .kid-header {
-    padding: clamp(12px, 1.5vh, 24px);
-  }
-  
-  .kid-container .mantine-Title-root {
-    font-size: clamp(1.2rem, 2.5vw, 1.8rem) !important;
-  }
-  
-  .kid-container .progress-card {
-    padding: clamp(12px, 1.5vh, 24px) !important;
-    margin-bottom: clamp(12px, 1.5vh, 24px) !important;
+    overflow: hidden;
   }
 }
 
-/* Responsive grid for kid's day sections - adapts to screen width */
+/* Responsive grid for kid's day sections */
 .kid-days-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -756,30 +713,10 @@ body {
   .kid-days-grid {
     flex: 1;
     min-height: 0;
-    overflow: auto;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: clamp(12px, 1.5vw, 24px);
+    overflow: hidden;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
     align-content: start;
-  }
-}
-
-/* Kid day section - viewport responsive */
-@media (min-width: 768px) {
-  .kid-day-section {
-    font-size: clamp(12px, 1.3vw, 16px);
-  }
-  
-  .kid-day-header {
-    padding: clamp(10px, 1.2vh, 20px) clamp(12px, 1.5vw, 24px);
-  }
-  
-  .kid-chore-btn {
-    padding: clamp(10px, 1.2vh, 18px) clamp(12px, 1.5vw, 20px) !important;
-    gap: clamp(8px, 1vw, 16px) !important;
-  }
-  
-  .kid-chore-icon {
-    font-size: clamp(1.5rem, 2.5vw, 2.5rem) !important;
   }
 }
 
@@ -1241,32 +1178,9 @@ input[type="number"] {
   background: linear-gradient(135deg, #fef3c7 0%, #fce7f3 50%, #dbeafe 100%);
 }
 
-/* Rewards view - viewport scaled */
+/* Rewards view content */
 .rewards-content {
   flex: 1;
   min-height: 0;
-  overflow: auto;
-}
-
-@media (min-width: 768px) {
-  .rewards-content {
-    overflow: hidden;
-  }
-  
-  .rewards-content .mantine-SimpleGrid-root {
-    height: 100%;
-  }
-  
-  .rewards-content .mantine-Paper-root {
-    max-height: calc(50vh - 60px);
-    overflow: auto;
-  }
-  
-  .rewards-content .mantine-Title-root {
-    font-size: clamp(1rem, 1.8vw, 1.5rem) !important;
-  }
-  
-  .rewards-content .mantine-Text-root {
-    font-size: clamp(0.75rem, 1.2vw, 1rem);
-  }
+  overflow: hidden;
 }

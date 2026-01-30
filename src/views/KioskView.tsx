@@ -20,6 +20,7 @@ import dayjs from 'dayjs';
 import * as api from '../api';
 import type { KioskData, Assignment } from '../types';
 import { DAYS, SHORT_DAYS } from '../types';
+import { FitToScreen } from '../components/FitToScreen';
 
 function fireSmallConfetti() {
   confetti({
@@ -137,6 +138,12 @@ export default function KioskView() {
   };
 
   return (
+    <FitToScreen
+      baseWidth={1600}
+      baseHeight={900}
+      background="linear-gradient(180deg, #f0f9ff 0%, #f8fafc 50%, #ffffff 100%)"
+      padding={24}
+    >
     <Box className="kiosk-container safe-area-padding">
       {/* Desktop Header */}
       <Paper 
@@ -540,5 +547,6 @@ export default function KioskView() {
         </>
       )}
     </Box>
+    </FitToScreen>
   );
 }

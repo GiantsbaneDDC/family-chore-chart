@@ -22,6 +22,7 @@ import { IconHome, IconRefresh, IconTrophy, IconFlame, IconStar, IconMedal } fro
 import dayjs from 'dayjs';
 import * as api from '../api';
 import type { RewardsData, MemberAchievement, Achievement } from '../types';
+import { FitToScreen } from '../components/FitToScreen';
 
 const CONFETTI_COLORS = ['#ffd700', '#ff6b6b', '#4ecdc4', '#a855f7', '#3b82f6', '#22c55e'];
 
@@ -65,7 +66,13 @@ export default function RewardsView() {
   const sortedStreaks = [...streaks].sort((a, b) => b.streak - a.streak);
 
   return (
-    <Box className="kiosk-container safe-area-padding" style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fce7f3 50%, #ddd6fe 100%)' }}>
+    <FitToScreen
+      baseWidth={1600}
+      baseHeight={900}
+      background="linear-gradient(135deg, #fef3c7 0%, #fce7f3 50%, #ddd6fe 100%)"
+      padding={24}
+    >
+    <Box className="kiosk-container safe-area-padding" style={{ background: 'transparent' }}>
       {/* Header */}
       <Paper 
         p="lg" 
@@ -545,5 +552,6 @@ export default function RewardsView() {
         }
       `}</style>
     </Box>
+    </FitToScreen>
   );
 }
