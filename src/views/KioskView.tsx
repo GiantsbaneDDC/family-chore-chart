@@ -5,22 +5,18 @@ import {
   Text,
   Title,
   Paper,
-  Group,
-  Stack,
   ActionIcon,
-  Tooltip,
   Center,
   Loader,
   Badge,
-  ThemeIcon,
+  Tooltip,
 } from '@mantine/core';
-import { IconSettings, IconCheck, IconRefresh, IconTrophy } from '@tabler/icons-react';
+import { IconSettings, IconCheck } from '@tabler/icons-react';
 import confetti from 'canvas-confetti';
 import dayjs from 'dayjs';
 import * as api from '../api';
 import type { KioskData, Assignment } from '../types';
 import { DAYS, SHORT_DAYS } from '../types';
-import { FitToScreen } from '../components/FitToScreen';
 
 function fireSmallConfetti() {
   confetti({
@@ -33,17 +29,10 @@ function fireSmallConfetti() {
 
 function fireBigCelebration() {
   const count = 200;
-  const defaults = {
-    origin: { y: 0.7 },
-    zIndex: 9999,
-  };
+  const defaults = { origin: { y: 0.7 }, zIndex: 9999 };
 
   function fire(particleRatio: number, opts: confetti.Options) {
-    confetti({
-      ...defaults,
-      ...opts,
-      particleCount: Math.floor(count * particleRatio),
-    });
+    confetti({ ...defaults, ...opts, particleCount: Math.floor(count * particleRatio) });
   }
 
   fire(0.25, { spread: 26, startVelocity: 55 });
@@ -56,13 +45,11 @@ function fireBigCelebration() {
 export default function KioskView() {
   const [data, setData] = useState<KioskData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   const loadData = useCallback(async () => {
     try {
       const kioskData = await api.getKioskData();
       setData(kioskData);
-      setLastUpdate(new Date());
     } catch (err) {
       console.error('Failed to load kiosk data:', err);
     } finally {
@@ -80,11 +67,11 @@ export default function KioskView() {
 
   if (loading || !data) {
     return (
-      <Center h="100vh" bg="gray.0">
-        <Stack align="center" gap="md">
+      <Center h="100%" style={{ background: 'linear-gradient(180deg, #f0f9ff 0%, #ffffff 100%)' }}>
+        <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
           <Loader size="xl" color="blue" />
           <Text c="dimmed" fw={500}>Loading chores...</Text>
-        </Stack>
+        </Box>
       </Center>
     );
   }
@@ -104,20 +91,17 @@ export default function KioskView() {
       const wasCompleted = isCompleted(assignmentId);
       const result = await api.toggleCompletion(assignmentId);
       
-      // Fire confetti if completing (not uncompleting)
       if (result.completed && !wasCompleted) {
         fireSmallConfetti();
         
-        // Get the assignment to check if all chores for the day are now complete
         const assignment = assignments.find(a => a.id === assignmentId);
         if (assignment) {
-          const today = dayjs().day();
-          const dayAssignments = assignments.filter(a => a.day_of_week === today);
+          const todayDay = dayjs().day();
+          const dayAssignments = assignments.filter(a => a.day_of_week === todayDay);
           const dayCompletedCount = dayAssignments.filter(a => 
             a.id === assignmentId || completions.includes(a.id)
           ).length;
           
-          // If all day's chores are now complete, big celebration
           if (dayCompletedCount === dayAssignments.length) {
             setTimeout(fireBigCelebration, 300);
           }
@@ -130,422 +114,191 @@ export default function KioskView() {
     }
   };
 
-  // Calculate day stats
   const getDayStats = (dayIndex: number) => {
     const dayAssignments = assignments.filter(a => a.day_of_week === dayIndex);
     const completed = dayAssignments.filter(a => completions.includes(a.id)).length;
     return { total: dayAssignments.length, completed };
   };
 
-  return (
-    <FitToScreen
-      background="linear-gradient(180deg, #f0f9ff 0%, #f8fafc 50%, #ffffff 100%)"
-      padding={16}
-      minScreenWidth={768}
-    >
-    <Box className="kiosk-container safe-area-padding">
-      {/* Desktop Header */}
-      <Paper 
-        p="lg" 
-        mb="xl" 
-        radius="xl" 
-        shadow="md"
-        visibleFrom="sm"
-        style={{ 
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          border: '1px solid #e2e8f0'
-        }}
-      >
-        <Group justify="space-between" wrap="wrap" gap="md">
-          <div>
-            <Title 
-              order={1} 
-              fw={900} 
-              size="h2"
-              style={{ 
-                background: 'linear-gradient(135deg, #1e40af, #7c3aed)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
-              }}
-            >
-              ✨ Family Chore Chart
-            </Title>
-            <Text size="sm" c="dimmed" fw={500} mt={4}>
-              Week of {dayjs(data.weekStart).format('MMMM D, YYYY')}
-            </Text>
-          </div>
-          <Group gap="sm">
-            <Tooltip label={`Updated ${dayjs(lastUpdate).format('h:mm:ss A')}`}>
-              <ActionIcon 
-                variant="light" 
-                onClick={loadData} 
-                size="xl" 
-                radius="xl"
-                color="gray"
-              >
-                <IconRefresh size={22} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Rewards & Achievements">
-              <ActionIcon 
-                component={Link} 
-                to="/rewards" 
-                variant="light" 
-                size="xl" 
-                radius="xl"
-                color="yellow"
-              >
-                <IconTrophy size={22} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Admin Settings">
-              <ActionIcon 
-                component={Link} 
-                to="/admin" 
-                variant="light" 
-                size="xl" 
-                radius="xl"
-                color="gray"
-              >
-                <IconSettings size={22} />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        </Group>
-      </Paper>
-
-      {/* Mobile Compact Header */}
-      <Group justify="space-between" align="center" mb="md" hiddenFrom="sm">
-        <Title 
-          order={2} 
-          fw={900} 
-          size="h4"
-          style={{ 
-            background: 'linear-gradient(135deg, #1e40af, #7c3aed)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent'
-          }}
-        >
-          ✨ Chores
-        </Title>
-        <Group gap="xs">
-          <ActionIcon 
-            variant="light" 
-            onClick={loadData} 
-            size="lg" 
-            radius="xl"
-            color="gray"
-          >
-            <IconRefresh size={18} />
-          </ActionIcon>
-          <ActionIcon 
-            component={Link} 
-            to="/rewards" 
-            variant="light" 
-            size="lg" 
-            radius="xl"
-            color="yellow"
-          >
-            <IconTrophy size={18} />
-          </ActionIcon>
-          <ActionIcon 
-            component={Link} 
-            to="/admin" 
-            variant="light" 
-            size="lg" 
-            radius="xl"
-            color="gray"
-          >
-            <IconSettings size={18} />
-          </ActionIcon>
-        </Group>
-      </Group>
-
-      {members.length === 0 ? (
-        <Center h="50vh">
-          <Paper p="xl" radius="xl" shadow="sm" className="empty-state">
-            <Text size="4rem" mb="md">👨‍👩‍👧‍👦</Text>
-            <Title order={3} mb="xs">No family members yet!</Title>
-            <Text c="dimmed" mb="lg">
-              Add family members to start tracking chores.
-            </Text>
-            <ActionIcon
-              component={Link}
-              to="/admin"
-              variant="filled"
-              size={60}
-              radius="xl"
-              color="blue"
-            >
+  if (members.length === 0) {
+    return (
+      <Center h="100%">
+        <Paper p="xl" radius="xl" shadow="sm">
+          <Text size="4rem" mb="md" ta="center">👨‍👩‍👧‍👦</Text>
+          <Title order={3} mb="xs" ta="center">No family members yet!</Title>
+          <Text c="dimmed" mb="lg" ta="center">Add family members to start tracking chores.</Text>
+          <Center>
+            <ActionIcon component={Link} to="/admin" variant="filled" size={60} radius="xl" color="blue">
               <IconSettings size={28} />
             </ActionIcon>
-          </Paper>
-        </Center>
-      ) : (
-        <>
-          {/* Mobile Quick Access Avatars - at top */}
-          <Box hiddenFrom="sm" mb="md">
-            <Group justify="center" gap="md">
-              {members.map(member => (
-                <Link key={member.id} to={`/my/${member.id}`} style={{ textDecoration: 'none' }}>
-                  <Stack align="center" gap={4}>
-                    <div 
-                      className="quick-access-avatar"
-                      style={{ background: member.color, width: 52, height: 52, fontSize: '1.6rem' }}
-                    >
-                      {member.avatar}
-                    </div>
-                    <Text size="xs" fw={600} c="dimmed" style={{ maxWidth: 60, textAlign: 'center' }} lineClamp={1}>
-                      {member.name.split(' ')[0]}
-                    </Text>
-                  </Stack>
-                </Link>
-              ))}
-            </Group>
-          </Box>
+          </Center>
+        </Paper>
+      </Center>
+    );
+  }
 
-          {/* Desktop Table View */}
-          <Box className="kiosk-table-wrapper" visibleFrom="sm">
-            <table className="swim-lane-table">
-              <thead>
-                <tr>
-                  <th>
-                    <Text fw={800} size="sm" c="dimmed">Family</Text>
-                  </th>
-                  {DAYS.map((day, i) => {
-                    const stats = getDayStats(i);
-                    const isToday = i === today;
-                    return (
-                      <th key={day}>
-                        <div className={`day-header ${isToday ? 'day-header-today' : ''}`}>
-                          <Text fw={800} size="lg">
-                            {SHORT_DAYS[i]}
-                          </Text>
-                          {isToday && (
-                            <Badge size="sm" variant="white" color="white" c="blue">
-                              TODAY
-                            </Badge>
-                          )}
-                          {stats.total > 0 && (
-                            <Text size="xs" fw={600} style={{ opacity: 0.8 }}>
-                              {stats.completed}/{stats.total}
-                            </Text>
-                          )}
-                        </div>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {members.map(member => (
-                  <tr key={member.id}>
-                    <td>
-                      <Paper
-                        className="member-cell"
-                        component={Link}
-                        to={`/my/${member.id}`}
-                        style={{ 
-                          textDecoration: 'none',
+  return (
+    <Box
+      style={{
+        height: '100%',
+        display: 'grid',
+        gridTemplateColumns: `80px repeat(7, 1fr)`,
+        gridTemplateRows: `50px repeat(${members.length}, 1fr)`,
+        gap: 2,
+        background: '#e2e8f0',
+        borderRadius: 16,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Header Row */}
+      <Box style={{ background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Text size="xs" fw={700} c="dimmed">FAMILY</Text>
+      </Box>
+      
+      {DAYS.map((_, i) => {
+        const isToday = i === today;
+        const stats = getDayStats(i);
+        
+        return (
+          <Box
+            key={i}
+            style={{
+              background: isToday 
+                ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' 
+                : '#f1f5f9',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 2,
+              padding: 4,
+            }}
+          >
+            <Text size="sm" fw={800} c={isToday ? 'white' : 'dark'}>
+              {SHORT_DAYS[i]}
+            </Text>
+            {isToday && (
+              <Badge size="xs" variant="white" color="white" c="blue">TODAY</Badge>
+            )}
+            {stats.total > 0 && (
+              <Text size="xs" fw={600} c={isToday ? 'white' : 'dimmed'} style={{ opacity: 0.8 }}>
+                {stats.completed}/{stats.total}
+              </Text>
+            )}
+          </Box>
+        );
+      })}
+
+      {/* Member Rows */}
+      {members.map(member => (
+        <>
+          {/* Member Avatar Cell */}
+          <Tooltip key={`avatar-${member.id}`} label={`${member.name}'s Chores`} position="right">
+            <Box
+              component={Link}
+              to={`/my/${member.id}`}
+              style={{
+                background: '#ffffff',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 4,
+                textDecoration: 'none',
+                cursor: 'pointer',
+                transition: 'background 0.2s',
+                borderLeft: `4px solid ${member.color}`,
+              }}
+            >
+              <Text style={{ fontSize: '2rem' }}>{member.avatar}</Text>
+              <Text size="xs" fw={700} c="dark" ta="center" lineClamp={1} style={{ maxWidth: 70 }}>
+                {member.name.split(' ')[0]}
+              </Text>
+            </Box>
+          </Tooltip>
+
+          {/* Chore Cells for each day */}
+          {DAYS.map((_, dayIndex) => {
+            const dayAssignments = getAssignmentsForMemberDay(member.id, dayIndex);
+            const isToday = dayIndex === today;
+
+            return (
+              <Box
+                key={`${member.id}-${dayIndex}`}
+                style={{
+                  background: isToday ? '#eff6ff' : '#ffffff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
+                  padding: 6,
+                  overflow: 'hidden',
+                }}
+              >
+                {dayAssignments.map(assignment => {
+                  const completed = isCompleted(assignment.id);
+                  return (
+                    <Tooltip 
+                      key={assignment.id} 
+                      label={assignment.chore_title}
+                      position="top"
+                      withArrow
+                    >
+                      <Box
+                        onClick={() => handleToggle(assignment.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '6px 10px',
+                          borderRadius: 8,
+                          background: completed ? '#dcfce7' : '#f1f5f9',
+                          border: completed ? '2px solid #22c55e' : '2px solid transparent',
                           cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          position: 'relative',
+                          opacity: completed ? 0.85 : 1,
+                          width: '100%',
                         }}
                       >
-                        <div 
+                        <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{assignment.chore_icon}</span>
+                        <span 
                           style={{ 
-                            position: 'absolute',
-                            left: 0,
-                            top: 0,
-                            bottom: 0,
-                            width: 5,
-                            background: member.color,
-                            borderRadius: '4px 0 0 4px'
-                          }} 
-                        />
-                        <Group gap="md" wrap="nowrap">
-                          <Text size="2.5rem">{member.avatar}</Text>
-                          <div>
-                            <Text fw={800} size="md" c="dark" lineClamp={1}>
-                              {member.name}
-                            </Text>
-                            <Text size="xs" c="blue" fw={600}>
-                              View chores →
-                            </Text>
-                          </div>
-                        </Group>
-                      </Paper>
-                    </td>
-                    {DAYS.map((_, dayIndex) => {
-                      const dayAssignments = getAssignmentsForMemberDay(member.id, dayIndex);
-                      const isToday = dayIndex === today;
-                      
-                      return (
-                        <td key={dayIndex}>
-                          <div className={`swim-cell ${isToday ? 'swim-cell-today' : ''}`}>
-                            <Stack gap={8}>
-                              {dayAssignments.length === 0 ? (
-                                <Text size="sm" c="dimmed" ta="center" py="md">—</Text>
-                              ) : (
-                                dayAssignments.map(assignment => {
-                                  const completed = isCompleted(assignment.id);
-                                  return (
-                                    <div
-                                      key={assignment.id}
-                                      className={`chore-item ${completed ? 'chore-item-done' : ''}`}
-                                      onClick={() => handleToggle(assignment.id)}
-                                      role="button"
-                                      tabIndex={0}
-                                    >
-                                      <Text size="xl">{assignment.chore_icon}</Text>
-                                      <Text 
-                                        size="sm" 
-                                        fw={700}
-                                        td={completed ? 'line-through' : undefined}
-                                        style={{ opacity: completed ? 0.7 : 1 }}
-                                        lineClamp={1}
-                                      >
-                                        {assignment.chore_title}
-                                      </Text>
-                                      {completed && (
-                                        <div className="chore-checkmark checkmark-pop">
-                                          <IconCheck size={14} color="white" stroke={3} />
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })
-                              )}
-                            </Stack>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Box>
-
-          {/* Mobile Vertical View - sorted so today is first */}
-          <Box className="mobile-kiosk" hiddenFrom="sm">
-            <Stack gap="md">
-              {[...Array(7)].map((_, i) => {
-                // Start from today and wrap around
-                const dayIndex = (today + i) % 7;
-                const day = DAYS[dayIndex];
-                const isToday = dayIndex === today;
-                const dayHasChores = members.some(m => 
-                  getAssignmentsForMemberDay(m.id, dayIndex).length > 0
-                );
-                
-                if (!dayHasChores) return null;
-                
-                const stats = getDayStats(dayIndex);
-                
-                return (
-                  <div 
-                    key={day} 
-                    className="mobile-day-section slide-up"
-                    style={{ animationDelay: `${i * 50}ms` }}
-                  >
-                    <div className={`mobile-day-header ${isToday ? 'mobile-day-header-today' : ''}`}>
-                      <Group gap="sm">
-                        <Text fw={800}>{day}</Text>
-                        {isToday && (
-                          <Badge 
-                            size="sm" 
-                            variant={isToday ? 'white' : 'filled'} 
-                            color={isToday ? 'white' : 'blue'}
-                            c={isToday ? 'blue' : undefined}
-                          >
-                            TODAY
-                          </Badge>
-                        )}
-                      </Group>
-                      {stats.total > 0 && (
-                        <Badge 
-                          variant="light" 
-                          color={stats.completed === stats.total ? 'green' : 'gray'}
-                          size="lg"
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            flex: 1,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            textDecoration: completed ? 'line-through' : 'none',
+                          }}
                         >
-                          {stats.completed}/{stats.total}
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    {members.map(member => {
-                      const memberChores = getAssignmentsForMemberDay(member.id, dayIndex);
-                      if (memberChores.length === 0) return null;
-                      
-                      return (
-                        <div key={member.id} className="mobile-member-row">
-                          <div 
-                            className="mobile-member-avatar"
-                            style={{ background: `${member.color}20` }}
+                          {assignment.chore_title}
+                        </span>
+                        {completed && (
+                          <Box
+                            style={{
+                              width: 18,
+                              height: 18,
+                              background: '#22c55e',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
                           >
-                            {member.avatar}
-                          </div>
-                          <div className="mobile-chores-list">
-                            {memberChores.map(assignment => {
-                              const completed = isCompleted(assignment.id);
-                              return (
-                                <div
-                                  key={assignment.id}
-                                  className={`mobile-chore-chip ${completed ? 'mobile-chore-chip-done' : ''}`}
-                                  onClick={() => handleToggle(assignment.id)}
-                                  role="button"
-                                  tabIndex={0}
-                                >
-                                  <Text>{assignment.chore_icon}</Text>
-                                  <Text fw={600}>{assignment.chore_title}</Text>
-                                  {completed && (
-                                    <ThemeIcon size="sm" radius="xl" color="green" ml={4}>
-                                      <IconCheck size={12} stroke={3} />
-                                    </ThemeIcon>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </Stack>
-          </Box>
-
-          {/* Quick Access Avatars - tablets only, hidden on large screens for no-scroll */}
-          <Paper 
-            p="md" 
-            radius="xl" 
-            mt="xl" 
-            shadow="sm"
-            visibleFrom="sm"
-            hiddenFrom="lg"
-            style={{ background: 'linear-gradient(135deg, #f0f9ff 0%, #fdf4ff 50%, #fef3c7 100%)' }}
-          >
-            <Text ta="center" fw={700} c="dimmed" size="sm" mb="md">
-              Tap to view individual chores
-            </Text>
-            <div className="quick-access-grid">
-              {members.map(member => (
-                <Tooltip key={member.id} label={`${member.name}'s Chores`} position="bottom">
-                  <Link to={`/my/${member.id}`} style={{ textDecoration: 'none' }}>
-                    <div 
-                      className="quick-access-avatar"
-                      style={{ background: member.color }}
-                    >
-                      {member.avatar}
-                    </div>
-                  </Link>
-                </Tooltip>
-              ))}
-            </div>
-          </Paper>
+                            <IconCheck size={10} color="white" stroke={3} />
+                          </Box>
+                        )}
+                      </Box>
+                    </Tooltip>
+                  );
+                })}
+              </Box>
+            );
+          })}
         </>
-      )}
+      ))}
     </Box>
-    </FitToScreen>
   );
 }

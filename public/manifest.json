@@ -2,22 +2,22 @@
   "name": "Family Chore Chart",
   "short_name": "Chores",
   "description": "Family chore tracking app",
-  "start_url": "/",
-  "display": "standalone",
+  "start_url": "/?fullscreen=true",
+  "display": "fullscreen",
   "background_color": "#ffffff",
   "theme_color": "#228be6",
   "orientation": "any",
   "icons": [
     {
-      "src": "/icon-192.svg",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-512.svg",
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     }
   ]

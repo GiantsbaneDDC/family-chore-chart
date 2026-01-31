@@ -1,11 +1,12 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import KioskView from './views/KioskView';
 import KidView from './views/KidView';
 import AdminView from './views/AdminView';
 import PinEntry from './views/PinEntry';
 import RewardsView from './views/RewardsView';
+import { KioskLayout } from './components/KioskLayout';
 
-export default function App() {
+function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<KioskView />} />
@@ -15,5 +16,13 @@ export default function App() {
       <Route path="/admin" element={<AdminView />} />
       <Route path="/rewards" element={<RewardsView />} />
     </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <KioskLayout>
+      <AppRoutes />
+    </KioskLayout>
   );
 }
