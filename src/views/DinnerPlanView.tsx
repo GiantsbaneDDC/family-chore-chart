@@ -446,33 +446,34 @@ export default function DinnerPlanView() {
                   {plan.notes && (
                     <Text size="xs" c="dimmed" ta="center" mt="xs" lineClamp={1}>📝 {plan.notes}</Text>
                   )}
-                  <Group gap="xs" justify="center" mt="sm">
+                  <Stack gap="xs" align="center" mt="md">
                     {recipe.source_url && (
-                      <Tooltip label="View original">
+                      <Tooltip label="View original recipe" position="left">
                         <ActionIcon 
-                          size="sm" 
+                          size="xl" 
                           variant="light" 
                           color="gray"
+                          radius="xl"
                           onClick={(e) => {
                             e.stopPropagation();
                             openSourceViewer(recipe.source_url!, recipe.title);
                           }}
                         >
-                          <IconWorld size={14} />
+                          <IconWorld size={24} />
                         </ActionIcon>
                       </Tooltip>
                     )}
-                    <Tooltip label="Change meal">
-                      <ActionIcon size="sm" variant="light" color="blue" onClick={(e) => handleEditDay(dayIndex, e)}>
-                        <IconPlus size={14} />
+                    <Tooltip label="Change meal" position="left">
+                      <ActionIcon size="xl" variant="light" color="blue" radius="xl" onClick={(e) => handleEditDay(dayIndex, e)}>
+                        <IconPlus size={24} />
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label="Clear">
-                      <ActionIcon size="sm" variant="light" color="red" onClick={(e) => handleClearDay(dayIndex, e)}>
-                        <IconX size={14} />
+                    <Tooltip label="Clear" position="left">
+                      <ActionIcon size="xl" variant="light" color="red" radius="xl" onClick={(e) => handleClearDay(dayIndex, e)}>
+                        <IconX size={24} />
                       </ActionIcon>
                     </Tooltip>
-                  </Group>
+                  </Stack>
                 </Box>
               ) : (
                 <Center style={{ flex: 1, flexDirection: 'column', gap: 8 }}>
