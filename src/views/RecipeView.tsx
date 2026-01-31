@@ -273,23 +273,26 @@ export default function RecipeView() {
         }}
       >
         <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <Paper p="xs" style={{ background: '#f8f9fa', borderBottom: '1px solid #e9ecef', flexShrink: 0 }}>
-            <Group gap="xs">
+          <Paper p="md" style={{ background: '#fff7ed', borderBottom: '1px solid #fed7aa', flexShrink: 0 }}>
+            <Group justify="space-between" align="center">
+              <Box>
+                <Text size="sm" fw={500}>Page not loading?</Text>
+                <Text size="xs" c="dimmed">Some sites block embedding. Open in a new tab instead.</Text>
+              </Box>
               <Button 
-                size="xs" 
-                variant="light"
+                color="orange"
                 component="a"
                 href={recipe.source_url || ''}
                 target="_blank"
-                leftSection={<IconExternalLink size={14} />}
+                leftSection={<IconExternalLink size={16} />}
               >
                 Open in New Tab
               </Button>
-              <Text size="xs" c="dimmed" style={{ flex: 1 }} lineClamp={1}>
-                {recipe.source_url}
-              </Text>
             </Group>
           </Paper>
+          <Text size="xs" c="dimmed" p="xs" ta="center" style={{ background: '#f8f9fa', borderBottom: '1px solid #e9ecef' }}>
+            {recipe.source_url}
+          </Text>
           {recipe.source_url && (
             <iframe
               src={recipe.source_url}
@@ -299,7 +302,7 @@ export default function RecipeView() {
                 border: 'none',
               }}
               title="Recipe Source"
-              sandbox="allow-scripts allow-same-origin"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
             />
           )}
         </Box>
