@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import HomeView from './views/HomeView';
 import KioskView from './views/KioskView';
@@ -9,6 +10,9 @@ import DinnerPlanView from './views/DinnerPlanView';
 import RecipeView from './views/RecipeView';
 import CalendarView from './views/CalendarView';
 import { KioskLayout } from './components/KioskLayout';
+import { IdleScreen } from './components/IdleScreen';
+
+const IDLE_TIMEOUT = 2 * 60 * 1000; // 2 minutes of inactivity
 
 function AppRoutes() {
   return (
@@ -28,9 +32,59 @@ function AppRoutes() {
 }
 
 export default function App() {
+  const [isIdle, setIsIdle] = useState(false);
+  const [familyAvatars, setFamilyAvatars] = useState<string[]>([]);
+
+  // Fetch family avatars for the idle screen
+  useEffect(() => {
+    fetch('/api/members')
+      .then(r => r.json())
+      .then(members => {
+        if (Array.isArray(members) && members.length > 0) {
+          setFamilyAvatars(members.map((m: any) => m.avatar));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Idle detection
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const resetTimer = () => {
+      setIsIdle(false);
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => setIsIdle(true), IDLE_TIMEOUT);
+    };
+
+    // Events that count as activity
+    const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(event => window.addEventListener(event, resetTimer));
+
+    // Start the timer
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeoutId);
+      events.forEach(event => window.removeEventListener(event, resetTimer));
+    };
+  }, []);
+
+  const handleWake = useCallback(() => {
+    setIsIdle(false);
+  }, []);
+
   return (
-    <KioskLayout>
-      <AppRoutes />
-    </KioskLayout>
+    <>
+      {isIdle && (
+        <IdleScreen 
+          onWake={handleWake} 
+          familyAvatars={familyAvatars.length > 0 ? familyAvatars : undefined}
+        />
+      )}
+      <KioskLayout>
+        <AppRoutes />
+      </KioskLayout>
+    </>
   );
 }

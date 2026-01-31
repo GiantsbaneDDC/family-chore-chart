@@ -626,6 +626,35 @@ app.post('/api/admin/logout', (req, res) => {
   res.json({ success: true });
 });
 
+// Reset all stars (admin only)
+app.post('/api/admin/reset-stars', async (req, res) => {
+  if (!req.session.isAdmin) {
+    return res.status(403).json({ error: 'Admin authentication required' });
+  }
+  
+  try {
+    // Reset all family members' total_stars to 0
+    await pool.query('UPDATE family_members SET total_stars = 0');
+    
+    // Add a history entry for each member noting the reset
+    const members = await pool.query('SELECT id, name, total_stars FROM family_members');
+    for (const member of members.rows) {
+      await pool.query(
+        'INSERT INTO star_history (member_id, stars, description) VALUES ($1, $2, $3)',
+        [member.id, 0, '⚡ Stars reset by admin']
+      );
+    }
+    
+    // Optionally clear old extra task claims (but keep history via star_history)
+    // Not deleting claims - they serve as historical record
+    
+    res.json({ success: true, message: 'All stars have been reset to 0' });
+  } catch (err) {
+    console.error('Error resetting stars:', err);
+    res.status(500).json({ error: 'Failed to reset stars' });
+  }
+});
+
 // ================== ALLOWANCE SETTINGS API ==================
 
 // Get allowance settings

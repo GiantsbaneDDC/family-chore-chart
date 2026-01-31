@@ -798,7 +798,7 @@ export default function AdminView() {
         <Tabs.Panel value="settings">
           <Text fw={700} size="lg" mb="lg">Bonus Tasks</Text>
           <Text size="sm" c="dimmed" mb="lg">
-            Extra tasks that anyone can claim and complete for bonus stars. Great for one-off jobs!
+            Extra tasks that anyone can claim and complete for bonus stars. Only one person can claim each task per day - they reset daily!
           </Text>
           
           <Button 
@@ -810,7 +810,7 @@ export default function AdminView() {
             Add Bonus Task
           </Button>
           
-          <Stack gap="md">
+          <Stack gap="md" mb="xl">
             {extraTasks.length === 0 ? (
               <Paper p="xl" radius="lg" shadow="sm" withBorder ta="center">
                 <Text size="3rem" mb="md">⭐</Text>
@@ -854,6 +854,40 @@ export default function AdminView() {
               ))
             )}
           </Stack>
+
+          {/* Danger Zone */}
+          <Paper p="lg" radius="lg" withBorder style={{ borderColor: '#fca5a5', background: '#fef2f2' }}>
+            <Text fw={700} size="lg" c="red.7" mb="sm">⚠️ Danger Zone</Text>
+            <Text size="sm" c="dimmed" mb="md">
+              Reset all family members' stars to zero. This cannot be undone! History will be preserved.
+            </Text>
+            <Button 
+              color="red" 
+              variant="outline"
+              leftSection={<IconTrash size={16} />}
+              onClick={async () => {
+                if (!confirm('Are you sure you want to reset ALL stars to zero? This cannot be undone!')) return;
+                if (!confirm('Really? All stars will be gone. Type "yes" in the next prompt to confirm.')) return;
+                try {
+                  await api.resetAllStars();
+                  loadAllData();
+                  notifications.show({
+                    title: 'Stars Reset',
+                    message: 'All stars have been reset to 0',
+                    color: 'red',
+                  });
+                } catch {
+                  notifications.show({
+                    title: 'Error',
+                    message: 'Failed to reset stars',
+                    color: 'red',
+                  });
+                }
+              }}
+            >
+              Reset All Stars
+            </Button>
+          </Paper>
         </Tabs.Panel>
         </ScrollArea>
       </Tabs>

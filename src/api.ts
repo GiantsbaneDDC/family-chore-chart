@@ -82,6 +82,7 @@ export const verifyAdmin = (pin: string) => api.post('/admin/verify', { pin }).t
 export const getAdminStatus = () => api.get<{ isAdmin: boolean }>('/admin/status').then(r => r.data);
 export const logoutAdmin = () => api.post('/admin/logout');
 export const changeAdminPin = (pin: string) => api.put('/admin/pin', { pin });
+export const resetAllStars = () => api.post<{ success: boolean; message: string }>('/admin/reset-stars').then(r => r.data);
 
 // Analytics
 export const logAnalyticsEvent = (eventType: string, memberId?: number, metadata?: Record<string, unknown>) => 
