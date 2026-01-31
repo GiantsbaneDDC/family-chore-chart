@@ -35,6 +35,7 @@ import {
   IconLink,
   IconExternalLink,
   IconDownload,
+  IconCheck,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import * as api from '../api';
@@ -76,6 +77,7 @@ export default function DinnerPlanView() {
   const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
   const [previewRecipe, setPreviewRecipe] = useState<any>(null);
+  const [existingUrls, setExistingUrls] = useState<Set<string>>(new Set());
 
   const loadData = useCallback(async () => {
     try {
@@ -146,11 +148,32 @@ export default function DinnerPlanView() {
     }
   };
 
+  // Fetch existing recipe source URLs for duplicate detection
+  const fetchExistingUrls = async () => {
+    try {
+      const res = await fetch('/api/recipes/source-urls');
+      const data = await res.json();
+      setExistingUrls(new Set(data.urls || []));
+    } catch (err) {
+      console.error('Failed to fetch existing URLs:', err);
+    }
+  };
+
+  // Check if URL already exists (normalize for comparison)
+  const isUrlExisting = (url: string) => {
+    // Normalize URL for comparison (remove trailing slashes, protocol variations)
+    const normalize = (u: string) => u.replace(/^https?:\/\//, '').replace(/\/+$/, '').toLowerCase();
+    const normalized = normalize(url);
+    return Array.from(existingUrls).some(existing => normalize(existing) === normalized);
+  };
+
   // Recipe search
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setSearching(true);
     setSearchResults([]);
+    // Fetch existing URLs before showing results
+    await fetchExistingUrls();
     try {
       const res = await fetch('/api/recipes/search', {
         method: 'POST',
@@ -202,6 +225,7 @@ export default function DinnerPlanView() {
         ingredients: previewRecipe.ingredients || [],
         instructions: previewRecipe.instructions || [],
         tags: previewRecipe.tags || [],
+        source_url: previewRecipe.source_url,
       });
       notifications.show({ title: 'Saved!', message: `${previewRecipe.title} added to recipes`, color: 'green' });
       setPreviewRecipe(null);
@@ -324,7 +348,10 @@ export default function DinnerPlanView() {
                 variant="white" 
                 size="lg" 
                 radius="xl"
-                onClick={() => setSearchModalOpen(true)}
+                onClick={() => {
+                  setSearchModalOpen(true);
+                  fetchExistingUrls();
+                }}
               >
                 <IconSearch size={20} />
               </ActionIcon>
@@ -646,8 +673,9 @@ export default function DinnerPlanView() {
                 {searching && (
                   <Center py="xl">
                     <Stack align="center" gap="sm">
-                      <Loader color="orange" />
-                      <Text c="dimmed">Searching for recipes...</Text>
+                      <Loader color="orange" size="lg" />
+                      <Text fw={600} c="orange">🔍 Searching the web...</Text>
+                      <Text size="sm" c="dimmed">This may take a few seconds</Text>
                     </Stack>
                   </Center>
                 )}
@@ -655,53 +683,78 @@ export default function DinnerPlanView() {
                 {!searching && searchResults.length > 0 && (
                   <ScrollArea h={350}>
                     <Stack gap="sm">
-                      {searchResults.map((result, i) => (
-                        <Paper 
-                          key={i} 
-                          p="md" 
-                          radius="md" 
-                          withBorder
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => handleImport(result.url)}
-                        >
-                          <Group justify="space-between" align="flex-start">
-                            <Box style={{ flex: 1 }}>
-                              <Text fw={600} lineClamp={1}>{result.title}</Text>
-                              <Text size="sm" c="dimmed" lineClamp={2}>{result.description}</Text>
-                              <Group gap="xs" mt="xs">
-                                <Badge size="sm" variant="light" color="gray">
-                                  {result.source}
-                                </Badge>
-                                <ActionIcon 
-                                  size="sm" 
-                                  variant="subtle" 
-                                  component="a" 
-                                  href={result.url} 
-                                  target="_blank"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <IconExternalLink size={14} />
+                      {searchResults.map((result, i) => {
+                        const alreadyExists = isUrlExisting(result.url);
+                        return (
+                          <Paper 
+                            key={i} 
+                            p="md" 
+                            radius="md" 
+                            withBorder
+                            style={{ 
+                              cursor: alreadyExists ? 'default' : 'pointer',
+                              background: alreadyExists ? '#f0fdf4' : undefined,
+                              borderColor: alreadyExists ? '#86efac' : undefined,
+                            }}
+                            onClick={() => !alreadyExists && handleImport(result.url)}
+                          >
+                            <Group justify="space-between" align="flex-start">
+                              <Box style={{ flex: 1 }}>
+                                <Group gap="xs">
+                                  <Text fw={600} lineClamp={1}>{result.title}</Text>
+                                  {alreadyExists && (
+                                    <Tooltip label="Already in your recipes">
+                                      <Badge size="sm" color="green" variant="filled" leftSection={<IconCheck size={12} />}>
+                                        Saved
+                                      </Badge>
+                                    </Tooltip>
+                                  )}
+                                </Group>
+                                <Text size="sm" c="dimmed" lineClamp={2}>{result.description}</Text>
+                                <Group gap="xs" mt="xs">
+                                  <Badge size="sm" variant="light" color="gray">
+                                    {result.source}
+                                  </Badge>
+                                  <ActionIcon 
+                                    size="sm" 
+                                    variant="subtle" 
+                                    component="a" 
+                                    href={result.url} 
+                                    target="_blank"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <IconExternalLink size={14} />
+                                  </ActionIcon>
+                                </Group>
+                              </Box>
+                              {alreadyExists ? (
+                                <ActionIcon size="lg" color="green" variant="light" radius="xl">
+                                  <IconCheck size={20} />
                                 </ActionIcon>
-                              </Group>
-                            </Box>
-                            <Button 
-                              size="xs" 
-                              color="orange" 
-                              variant="light"
-                              loading={importing}
-                            >
-                              Import
-                            </Button>
-                          </Group>
-                        </Paper>
-                      ))}
+                              ) : (
+                                <Button 
+                                  size="xs" 
+                                  color="orange" 
+                                  variant="light"
+                                  loading={importing}
+                                >
+                                  Import
+                                </Button>
+                              )}
+                            </Group>
+                          </Paper>
+                        );
+                      })}
                     </Stack>
                   </ScrollArea>
                 )}
 
-                {!searching && searchResults.length === 0 && searchQuery && (
+                {!searching && searchResults.length === 0 && !searchQuery && (
                   <Center py="xl">
-                    <Text c="dimmed">No results yet. Try searching!</Text>
+                    <Stack align="center" gap="xs">
+                      <Text size="2rem">🍳</Text>
+                      <Text c="dimmed">Type a dish and click Search</Text>
+                    </Stack>
                   </Center>
                 )}
               </Stack>

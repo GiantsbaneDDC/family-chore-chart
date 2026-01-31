@@ -186,6 +186,7 @@ export interface Recipe {
   ingredients: string[];
   instructions: string[];
   tags: string[];
+  source_url?: string;
   created_at: string;
 }
 

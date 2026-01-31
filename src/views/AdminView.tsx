@@ -39,11 +39,13 @@ import {
   IconCheck,
   IconSettings,
   IconStar,
+  IconToolsKitchen2,
+  IconExternalLink,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import * as api from '../api';
-import type { FamilyMember, Chore, Assignment, ExtraTask } from '../types';
-import { DAYS, SHORT_DAYS, MEMBER_COLORS, CHORE_ICONS, AVATAR_EMOJIS, EXTRA_TASK_ICONS } from '../types';
+import type { FamilyMember, Chore, Assignment, ExtraTask, Recipe } from '../types';
+import { DAYS, SHORT_DAYS, MEMBER_COLORS, CHORE_ICONS, AVATAR_EMOJIS, EXTRA_TASK_ICONS, RECIPE_ICONS } from '../types';
 
 export default function AdminView() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -83,6 +85,17 @@ export default function AdminView() {
     stars: 1,
   });
 
+  // Recipes
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [recipeModalOpened, { open: openRecipeModal, close: closeRecipeModal }] = useDisclosure();
+  const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
+  const [recipeForm, setRecipeForm] = useState({
+    title: '',
+    icon: '🍽️',
+    description: '',
+  });
+  const [recipeSearch, setRecipeSearch] = useState('');
+
   // Search filters
   const [choreSearch, setChoreSearch] = useState('');
   const [scheduleSearch, setScheduleSearch] = useState('');
@@ -110,18 +123,20 @@ export default function AdminView() {
 
   const loadAllData = async () => {
     try {
-      const [membersData, choresData, assignmentsData, historyData, extraTasksData] = await Promise.all([
+      const [membersData, choresData, assignmentsData, historyData, extraTasksData, recipesData] = await Promise.all([
         api.getMembers(),
         api.getChores(),
         api.getAssignments(),
         api.getHistory(4),
         api.getExtraTasks(),
+        api.getRecipes(),
       ]);
       setMembers(membersData);
       setChores(choresData);
       setAssignments(assignmentsData);
       setHistory(historyData);
       setExtraTasks(extraTasksData);
+      setRecipes(recipesData);
     } catch {
       notifications.show({
         title: 'Error',
@@ -271,6 +286,65 @@ export default function AdminView() {
   const resetExtraTaskForm = () => {
     setEditingExtraTask(null);
     setExtraTaskForm({ title: '', icon: '⭐', stars: 1 });
+  };
+
+  // Recipe handlers
+  const handleSaveRecipe = async () => {
+    try {
+      if (editingRecipe) {
+        await api.updateRecipe(editingRecipe.id, {
+          ...editingRecipe,
+          title: recipeForm.title,
+          icon: recipeForm.icon,
+          description: recipeForm.description,
+        });
+      } else {
+        await api.createRecipe({
+          title: recipeForm.title,
+          icon: recipeForm.icon,
+          description: recipeForm.description,
+          ingredients: [],
+          instructions: [],
+          tags: [],
+        });
+      }
+      loadAllData();
+      closeRecipeModal();
+      resetRecipeForm();
+      notifications.show({ 
+        title: 'Success', 
+        message: editingRecipe ? 'Recipe updated' : 'Recipe added',
+        color: 'green' 
+      });
+    } catch {
+      notifications.show({ title: 'Error', message: 'Failed to save recipe', color: 'red' });
+    }
+  };
+
+  const handleDeleteRecipe = async (id: number) => {
+    if (!confirm('Delete this recipe? This will also remove it from any dinner plans.')) return;
+    try {
+      await api.deleteRecipe(id);
+      loadAllData();
+      notifications.show({ title: 'Deleted', message: 'Recipe removed', color: 'gray' });
+    } catch {
+      notifications.show({ title: 'Error', message: 'Failed to delete recipe', color: 'red' });
+    }
+  };
+
+  const openEditRecipe = (recipe: Recipe) => {
+    setEditingRecipe(recipe);
+    setRecipeForm({ 
+      title: recipe.title, 
+      icon: recipe.icon, 
+      description: recipe.description || '',
+    });
+    openRecipeModal();
+  };
+
+  const resetRecipeForm = () => {
+    setEditingRecipe(null);
+    setRecipeForm({ title: '', icon: '🍽️', description: '' });
   };
 
   const handleDeleteChore = async (id: number) => {
@@ -435,6 +509,7 @@ export default function AdminView() {
             <Tabs.Tab value="members" leftSection={<IconUsers size={16} />}>Family</Tabs.Tab>
             <Tabs.Tab value="chores" leftSection={<IconChecklist size={16} />}>Chores</Tabs.Tab>
             <Tabs.Tab value="assignments" leftSection={<IconCalendar size={16} />}>Schedule</Tabs.Tab>
+            <Tabs.Tab value="recipes" leftSection={<IconToolsKitchen2 size={16} />}>Recipes</Tabs.Tab>
             <Tabs.Tab value="history" leftSection={<IconHistory size={16} />}>History</Tabs.Tab>
             <Tabs.Tab value="settings" leftSection={<IconSettings size={16} />}>Bonus Tasks</Tabs.Tab>
           </Tabs.List>
@@ -715,6 +790,111 @@ export default function AdminView() {
               </div>
             </>
           )}
+        </Tabs.Panel>
+
+        {/* RECIPES TAB */}
+        <Tabs.Panel value="recipes">
+          <Group justify="space-between" mb="lg">
+            <Text fw={700} size="lg">Recipes ({recipes.length})</Text>
+            <Group gap="md">
+              <TextInput
+                placeholder="Search recipes..."
+                value={recipeSearch}
+                onChange={(e) => setRecipeSearch(e.target.value)}
+                radius="xl"
+                style={{ width: 200 }}
+              />
+              <Button 
+                leftSection={<IconPlus size={18} />}
+                onClick={() => { resetRecipeForm(); openRecipeModal(); }}
+                radius="xl"
+                color="orange"
+              >
+                Add Recipe
+              </Button>
+            </Group>
+          </Group>
+
+          <div className="admin-grid">
+            {recipes
+              .filter(r => r.title.toLowerCase().includes(recipeSearch.toLowerCase()))
+              .map(recipe => (
+              <div key={recipe.id} className="admin-card">
+                <Group gap="md" style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 12,
+                      background: '#fff7ed',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 28
+                    }}
+                  >
+                    {recipe.icon}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Text fw={700} size="lg" lineClamp={1}>{recipe.title}</Text>
+                    <Group gap="xs">
+                      {recipe.prep_time && (
+                        <Badge size="xs" variant="light" color="gray">
+                          {recipe.prep_time}m prep
+                        </Badge>
+                      )}
+                      {recipe.cook_time && (
+                        <Badge size="xs" variant="light" color="orange">
+                          {recipe.cook_time}m cook
+                        </Badge>
+                      )}
+                      {recipe.source_url && (
+                        <Tooltip label="Imported from web">
+                          <ActionIcon 
+                            size="xs" 
+                            variant="subtle" 
+                            component="a" 
+                            href={recipe.source_url} 
+                            target="_blank"
+                          >
+                            <IconExternalLink size={12} />
+                          </ActionIcon>
+                        </Tooltip>
+                      )}
+                    </Group>
+                  </div>
+                </Group>
+                <Group gap="xs">
+                  <ActionIcon 
+                    variant="light" 
+                    size="lg"
+                    radius="xl"
+                    color="orange"
+                    onClick={() => openEditRecipe(recipe)}
+                  >
+                    <IconEdit size={18} />
+                  </ActionIcon>
+                  <ActionIcon 
+                    variant="light" 
+                    color="red" 
+                    size="lg"
+                    radius="xl"
+                    onClick={() => handleDeleteRecipe(recipe.id)}
+                  >
+                    <IconTrash size={18} />
+                  </ActionIcon>
+                </Group>
+              </div>
+            ))}
+            
+            {recipes.length === 0 && (
+              <Paper p="xl" ta="center" radius="lg" className="empty-state">
+                <Text size="3rem" mb="sm">🍽️</Text>
+                <Text fw={600}>No recipes yet</Text>
+                <Text size="sm" c="dimmed">Add recipes or import them from the Dinner Plan page</Text>
+              </Paper>
+            )}
+          </div>
         </Tabs.Panel>
 
         {/* HISTORY TAB */}
@@ -1083,6 +1263,99 @@ export default function AdminView() {
             </Button>
             <Button onClick={handleSaveExtraTask} radius="xl" color="orange" leftSection={<IconCheck size={18} />}>
               {editingExtraTask ? 'Save Changes' : 'Add Task'}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* RECIPE MODAL */}
+      <Modal
+        opened={recipeModalOpened}
+        onClose={closeRecipeModal}
+        title={
+          <Text fw={700} size="lg">
+            {editingRecipe ? 'Edit Recipe' : 'Add Recipe'}
+          </Text>
+        }
+        size="md"
+        radius="lg"
+        centered={!isMobile}
+        fullScreen={isMobile}
+      >
+        <Stack gap="md">
+          <TextInput
+            label="Recipe Name"
+            placeholder="e.g., Chicken Parma"
+            value={recipeForm.title}
+            onChange={(e) => setRecipeForm({ ...recipeForm, title: e.target.value })}
+            size="md"
+            radius="md"
+            required
+          />
+
+          <TextInput
+            label="Description (optional)"
+            placeholder="A brief description of the dish"
+            value={recipeForm.description}
+            onChange={(e) => setRecipeForm({ ...recipeForm, description: e.target.value })}
+            size="md"
+            radius="md"
+          />
+
+          <div>
+            <Text size="sm" fw={600} mb="sm">Icon</Text>
+            <div className="emoji-grid">
+              {RECIPE_ICONS.map(icon => (
+                <button
+                  key={icon}
+                  type="button"
+                  className={`emoji-btn ${recipeForm.icon === icon ? 'selected' : ''}`}
+                  onClick={() => setRecipeForm({ ...recipeForm, icon })}
+                >
+                  {icon}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {editingRecipe && (
+            <Paper p="md" radius="md" withBorder bg="gray.0">
+              <Text size="sm" c="dimmed" mb="xs">Recipe Details</Text>
+              <Group gap="md">
+                <Badge variant="light" color="gray">
+                  {editingRecipe.ingredients?.length || 0} ingredients
+                </Badge>
+                <Badge variant="light" color="gray">
+                  {editingRecipe.instructions?.length || 0} steps
+                </Badge>
+                {editingRecipe.source_url && (
+                  <Button 
+                    size="xs" 
+                    variant="light" 
+                    component="a" 
+                    href={editingRecipe.source_url} 
+                    target="_blank"
+                    leftSection={<IconExternalLink size={14} />}
+                  >
+                    View Source
+                  </Button>
+                )}
+              </Group>
+            </Paper>
+          )}
+
+          <Group justify="flex-end" mt="md" gap="sm">
+            <Button variant="subtle" onClick={closeRecipeModal} radius="xl">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveRecipe} 
+              radius="xl" 
+              color="orange" 
+              leftSection={<IconCheck size={18} />}
+              disabled={!recipeForm.title.trim()}
+            >
+              {editingRecipe ? 'Save Changes' : 'Add Recipe'}
             </Button>
           </Group>
         </Stack>

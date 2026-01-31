@@ -1569,7 +1569,7 @@ app.get('/api/recipes', async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT id, title, icon, description, prep_time, cook_time, servings, 
-             ingredients, instructions, tags, created_at
+             ingredients, instructions, tags, source_url, created_at
       FROM recipes 
       ORDER BY title
     `);
@@ -1601,13 +1601,13 @@ app.get('/api/recipes/:id', async (req, res) => {
 // Create recipe
 app.post('/api/recipes', async (req, res) => {
   try {
-    const { title, icon, description, prep_time, cook_time, servings, ingredients, instructions, tags } = req.body;
+    const { title, icon, description, prep_time, cook_time, servings, ingredients, instructions, tags, source_url } = req.body;
     if (!title) {
       return res.status(400).json({ error: 'Title required' });
     }
     const result = await pool.query(
-      `INSERT INTO recipes (title, icon, description, prep_time, cook_time, servings, ingredients, instructions, tags) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      `INSERT INTO recipes (title, icon, description, prep_time, cook_time, servings, ingredients, instructions, tags, source_url) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [
         title, 
         icon || '🍽️', 
@@ -1617,7 +1617,8 @@ app.post('/api/recipes', async (req, res) => {
         servings || 4,
         JSON.stringify(ingredients || []),
         JSON.stringify(instructions || []),
-        JSON.stringify(tags || [])
+        JSON.stringify(tags || []),
+        source_url || null
       ]
     );
     res.json(result.rows[0]);
@@ -1672,7 +1673,20 @@ app.delete('/api/recipes/:id', async (req, res) => {
   }
 });
 
-// Search for recipes on the web (uses AI to search)
+// Get existing recipe source URLs (for duplicate checking)
+app.get('/api/recipes/source-urls', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT source_url FROM recipes WHERE source_url IS NOT NULL'
+    );
+    res.json({ urls: result.rows.map(r => r.source_url) });
+  } catch (err) {
+    console.error('Error fetching source URLs:', err);
+    res.status(500).json({ error: 'Failed to fetch source URLs' });
+  }
+});
+
+// Search for recipes on the web (uses AI with web search)
 app.post('/api/recipes/search', async (req, res) => {
   try {
     const { query } = req.body;
@@ -1680,36 +1694,37 @@ app.post('/api/recipes/search', async (req, res) => {
       return res.status(400).json({ error: 'Query required' });
     }
     
-    // Use AI to search and return recipe results
-    const searchPrompt = `Search the web for "${query} recipe" and return 6-8 recipe results.
+    // Use Clawdbot agent to search the web
+    const searchPrompt = `Search the web for "${query} recipe". Find 6-8 good recipe results from popular cooking sites.
 
-Return ONLY valid JSON array in this exact format, nothing else:
+Return ONLY a valid JSON array with this exact format, nothing else before or after:
 [
-  {"title": "Recipe Name", "url": "https://...", "description": "Brief description of the recipe", "source": "website.com"}
-]
-
-Focus on popular recipe sites like allrecipes, taste.com.au, delish, foodnetwork, bbcgoodfood, etc.
-Make sure URLs are real, valid recipe page URLs.`;
+  {"title": "Recipe Name", "url": "https://full-url-to-recipe", "description": "Brief description", "source": "website.com"}
+]`;
 
     const aiRes = await fetch('http://127.0.0.1:18789/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (process.env.CLAWDBOT_TOKEN || ''),
+        'Authorization': 'Bearer ' + (process.env.CLAWDBOT_TOKEN || '2c79636f0d115b55778772d34ad10261575935836397b7ff'),
+        'x-clawdbot-agent-id': 'main'
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-3-5-haiku-latest',
+        model: 'clawdbot',
         messages: [{ role: 'user', content: searchPrompt }],
-        max_tokens: 1500
+        max_tokens: 2000
       })
     });
     
     if (!aiRes.ok) {
+      const errText = await aiRes.text();
+      console.error('AI search error:', errText);
       throw new Error(`Search failed: ${aiRes.status}`);
     }
     
     const aiData = await aiRes.json();
     const aiContent = aiData.choices?.[0]?.message?.content || '[]';
+    console.log('Search response:', aiContent.substring(0, 500));
     
     // Parse the JSON array from the response
     const jsonMatch = aiContent.match(/\[[\s\S]*\]/);
@@ -1718,7 +1733,7 @@ Make sure URLs are real, valid recipe page URLs.`;
     res.json({ results });
   } catch (err) {
     console.error('Error searching recipes:', err);
-    res.status(500).json({ error: 'Search failed' });
+    res.status(500).json({ error: 'Search failed: ' + err.message });
   }
 });
 
@@ -1772,7 +1787,8 @@ ${textContent}`;
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + (process.env.CLAWDBOT_TOKEN || ''),
+        'Authorization': 'Bearer ' + (process.env.CLAWDBOT_TOKEN || '2c79636f0d115b55778772d34ad10261575935836397b7ff'),
+        'x-clawdbot-agent-id': 'main'
       },
       body: JSON.stringify({
         model: 'anthropic/claude-3-5-haiku-latest',
