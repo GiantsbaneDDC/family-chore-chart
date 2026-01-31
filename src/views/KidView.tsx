@@ -238,6 +238,8 @@ export default function KidView() {
           gridTemplateRows: `40px repeat(${maxChoresPerDay}, 1fr)`,
           gap: 2,
           background: '#e2e8f0',
+          borderRadius: '0 0 16px 16px',
+          overflow: 'hidden',
         }}
       >
         {/* Day Headers */}

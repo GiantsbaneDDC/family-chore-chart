@@ -16,7 +16,12 @@ import {
   Select,
   Textarea,
   Tooltip,
+  TextInput,
+  Tabs,
+  ScrollArea,
+  Divider,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { 
   IconChevronLeft, 
   IconChevronRight, 
@@ -25,7 +30,11 @@ import {
   IconFlame,
   IconX,
   IconCopy,
-  IconChefHat
+  IconChefHat,
+  IconSearch,
+  IconLink,
+  IconExternalLink,
+  IconDownload,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import * as api from '../api';
@@ -58,6 +67,15 @@ export default function DinnerPlanView() {
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [assignRecipeId, setAssignRecipeId] = useState<string | null>(null);
   const [assignNotes, setAssignNotes] = useState('');
+  
+  // Recipe search/import state
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Array<{title: string; url: string; description: string; source: string}>>([]);
+  const [searching, setSearching] = useState(false);
+  const [importUrl, setImportUrl] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [previewRecipe, setPreviewRecipe] = useState<any>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -125,6 +143,76 @@ export default function DinnerPlanView() {
       loadData();
     } catch (err) {
       console.error('Failed to assign recipe:', err);
+    }
+  };
+
+  // Recipe search
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    setSearchResults([]);
+    try {
+      const res = await fetch('/api/recipes/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: searchQuery }),
+      });
+      const data = await res.json();
+      setSearchResults(data.results || []);
+    } catch (err) {
+      console.error('Search failed:', err);
+      notifications.show({ title: 'Error', message: 'Search failed', color: 'red' });
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  // Import recipe from URL
+  const handleImport = async (url: string) => {
+    setImporting(true);
+    setPreviewRecipe(null);
+    try {
+      const res = await fetch('/api/recipes/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setPreviewRecipe(data.recipe);
+    } catch (err: any) {
+      console.error('Import failed:', err);
+      notifications.show({ title: 'Import Failed', message: err.message || 'Could not import recipe', color: 'red' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // Save imported recipe
+  const handleSaveRecipe = async () => {
+    if (!previewRecipe) return;
+    try {
+      await api.createRecipe({
+        title: previewRecipe.title,
+        icon: previewRecipe.icon || '🍽️',
+        description: previewRecipe.description,
+        prep_time: previewRecipe.prep_time,
+        cook_time: previewRecipe.cook_time,
+        servings: previewRecipe.servings,
+        ingredients: previewRecipe.ingredients || [],
+        instructions: previewRecipe.instructions || [],
+        tags: previewRecipe.tags || [],
+      });
+      notifications.show({ title: 'Saved!', message: `${previewRecipe.title} added to recipes`, color: 'green' });
+      setPreviewRecipe(null);
+      setSearchModalOpen(false);
+      setSearchQuery('');
+      setSearchResults([]);
+      setImportUrl('');
+      loadData();
+    } catch (err) {
+      console.error('Save failed:', err);
+      notifications.show({ title: 'Error', message: 'Failed to save recipe', color: 'red' });
     }
   };
 
@@ -231,6 +319,16 @@ export default function DinnerPlanView() {
                 </ActionIcon>
               </Tooltip>
             )}
+            <Tooltip label="Find new recipe">
+              <ActionIcon 
+                variant="white" 
+                size="lg" 
+                radius="xl"
+                onClick={() => setSearchModalOpen(true)}
+              >
+                <IconSearch size={20} />
+              </ActionIcon>
+            </Tooltip>
           </Group>
         </Group>
       </Paper>
@@ -429,6 +527,218 @@ export default function DinnerPlanView() {
             </Button>
           </Group>
         </Stack>
+      </Modal>
+
+      {/* Recipe Search/Import Modal */}
+      <Modal
+        opened={searchModalOpen}
+        onClose={() => {
+          setSearchModalOpen(false);
+          setPreviewRecipe(null);
+          setSearchQuery('');
+          setSearchResults([]);
+          setImportUrl('');
+        }}
+        title={
+          <Group gap="sm">
+            <IconSearch size={24} color="#fd7e14" />
+            <Text fw={700} size="lg">Find New Recipe</Text>
+          </Group>
+        }
+        size="lg"
+        radius="lg"
+      >
+        {previewRecipe ? (
+          // Recipe Preview
+          <Stack gap="md">
+            <Paper p="md" radius="lg" style={{ background: '#fff7ed', border: '2px solid #fed7aa' }}>
+              <Group gap="md" mb="sm">
+                <Text style={{ fontSize: '2.5rem' }}>{previewRecipe.icon}</Text>
+                <Box style={{ flex: 1 }}>
+                  <Text fw={700} size="xl">{previewRecipe.title}</Text>
+                  {previewRecipe.description && (
+                    <Text c="dimmed" size="sm">{previewRecipe.description}</Text>
+                  )}
+                </Box>
+              </Group>
+              <Group gap="md">
+                {previewRecipe.prep_time && (
+                  <Badge leftSection={<IconClock size={12} />} color="orange" variant="light">
+                    {previewRecipe.prep_time}m prep
+                  </Badge>
+                )}
+                {previewRecipe.cook_time && (
+                  <Badge leftSection={<IconFlame size={12} />} color="orange" variant="light">
+                    {previewRecipe.cook_time}m cook
+                  </Badge>
+                )}
+                {previewRecipe.servings && (
+                  <Badge color="orange" variant="light">Serves {previewRecipe.servings}</Badge>
+                )}
+              </Group>
+            </Paper>
+
+            <Box>
+              <Text fw={600} mb="xs">Ingredients ({previewRecipe.ingredients?.length || 0})</Text>
+              <ScrollArea h={120}>
+                <Stack gap={4}>
+                  {previewRecipe.ingredients?.map((ing: string, i: number) => (
+                    <Text key={i} size="sm">• {ing}</Text>
+                  ))}
+                </Stack>
+              </ScrollArea>
+            </Box>
+
+            <Box>
+              <Text fw={600} mb="xs">Instructions ({previewRecipe.instructions?.length || 0} steps)</Text>
+              <ScrollArea h={120}>
+                <Stack gap={4}>
+                  {previewRecipe.instructions?.map((step: string, i: number) => (
+                    <Text key={i} size="sm">{i + 1}. {step}</Text>
+                  ))}
+                </Stack>
+              </ScrollArea>
+            </Box>
+
+            <Group justify="space-between" mt="md">
+              <Button variant="light" onClick={() => setPreviewRecipe(null)}>
+                ← Back
+              </Button>
+              <Button color="green" leftSection={<IconDownload size={18} />} onClick={handleSaveRecipe}>
+                Save Recipe
+              </Button>
+            </Group>
+          </Stack>
+        ) : (
+          // Search/Import UI
+          <Tabs defaultValue="search">
+            <Tabs.List mb="md">
+              <Tabs.Tab value="search" leftSection={<IconSearch size={16} />}>
+                Search Web
+              </Tabs.Tab>
+              <Tabs.Tab value="url" leftSection={<IconLink size={16} />}>
+                Paste URL
+              </Tabs.Tab>
+            </Tabs.List>
+
+            <Tabs.Panel value="search">
+              <Stack gap="md">
+                <Group gap="sm">
+                  <TextInput
+                    placeholder="Search for recipes... (e.g., chicken parma)"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    style={{ flex: 1 }}
+                    size="md"
+                    radius="md"
+                  />
+                  <Button 
+                    color="orange" 
+                    onClick={handleSearch} 
+                    loading={searching}
+                    leftSection={<IconSearch size={18} />}
+                  >
+                    Search
+                  </Button>
+                </Group>
+
+                {searching && (
+                  <Center py="xl">
+                    <Stack align="center" gap="sm">
+                      <Loader color="orange" />
+                      <Text c="dimmed">Searching for recipes...</Text>
+                    </Stack>
+                  </Center>
+                )}
+
+                {!searching && searchResults.length > 0 && (
+                  <ScrollArea h={350}>
+                    <Stack gap="sm">
+                      {searchResults.map((result, i) => (
+                        <Paper 
+                          key={i} 
+                          p="md" 
+                          radius="md" 
+                          withBorder
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => handleImport(result.url)}
+                        >
+                          <Group justify="space-between" align="flex-start">
+                            <Box style={{ flex: 1 }}>
+                              <Text fw={600} lineClamp={1}>{result.title}</Text>
+                              <Text size="sm" c="dimmed" lineClamp={2}>{result.description}</Text>
+                              <Group gap="xs" mt="xs">
+                                <Badge size="sm" variant="light" color="gray">
+                                  {result.source}
+                                </Badge>
+                                <ActionIcon 
+                                  size="sm" 
+                                  variant="subtle" 
+                                  component="a" 
+                                  href={result.url} 
+                                  target="_blank"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <IconExternalLink size={14} />
+                                </ActionIcon>
+                              </Group>
+                            </Box>
+                            <Button 
+                              size="xs" 
+                              color="orange" 
+                              variant="light"
+                              loading={importing}
+                            >
+                              Import
+                            </Button>
+                          </Group>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  </ScrollArea>
+                )}
+
+                {!searching && searchResults.length === 0 && searchQuery && (
+                  <Center py="xl">
+                    <Text c="dimmed">No results yet. Try searching!</Text>
+                  </Center>
+                )}
+              </Stack>
+            </Tabs.Panel>
+
+            <Tabs.Panel value="url">
+              <Stack gap="md">
+                <TextInput
+                  label="Recipe URL"
+                  placeholder="https://example.com/recipe..."
+                  value={importUrl}
+                  onChange={(e) => setImportUrl(e.target.value)}
+                  size="md"
+                  radius="md"
+                />
+                <Button 
+                  color="orange" 
+                  onClick={() => handleImport(importUrl)}
+                  disabled={!importUrl.trim()}
+                  loading={importing}
+                  leftSection={<IconDownload size={18} />}
+                >
+                  Import Recipe
+                </Button>
+
+                {importing && (
+                  <Center py="xl">
+                    <Stack align="center" gap="sm">
+                      <Loader color="orange" />
+                      <Text c="dimmed">Fetching and parsing recipe...</Text>
+                    </Stack>
+                  </Center>
+                )}
+              </Stack>
+            </Tabs.Panel>
+          </Tabs>
+        )}
       </Modal>
 
     </Box>

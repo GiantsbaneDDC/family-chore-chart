@@ -57,7 +57,7 @@ export default function RecipeView() {
     <Box style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header */}
       <Paper 
-        p="lg" 
+        p="md" 
         radius="xl" 
         shadow="sm"
         style={{
@@ -66,41 +66,38 @@ export default function RecipeView() {
         }}
       >
         <Group justify="space-between" align="center">
-          <Group gap="lg">
+          <Group gap="md">
             <ActionIcon 
               variant="white" 
-              size={50} 
+              size="lg" 
               radius="xl"
               onClick={() => navigate('/dinner')}
             >
-              <IconArrowLeft size={28} />
+              <IconArrowLeft size={20} />
             </ActionIcon>
-            <Text style={{ fontSize: '3.5rem' }}>{recipe.icon}</Text>
+            <Text style={{ fontSize: '2rem' }}>{recipe.icon}</Text>
             <Box>
-              <Title order={1} c="white" style={{ fontSize: '2.2rem' }}>{recipe.title}</Title>
+              <Title order={3} c="white">{recipe.title}</Title>
               {recipe.description && (
-                <Text c="white" size="lg" style={{ opacity: 0.9 }}>{recipe.description}</Text>
+                <Text c="white" size="sm" style={{ opacity: 0.9 }}>{recipe.description}</Text>
               )}
             </Box>
           </Group>
-          <Group gap="md">
+          <Group gap="sm">
             {recipe.prep_time && (
-              <Paper px="md" py="xs" radius="xl" style={{ background: 'white', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <IconClock size={20} color="#fd7e14" />
-                <Text size="lg" fw={600} c="dark">{recipe.prep_time} min prep</Text>
-              </Paper>
+              <Badge size="lg" variant="white" color="orange" leftSection={<IconClock size={14} />}>
+                {recipe.prep_time}m prep
+              </Badge>
             )}
             {recipe.cook_time && (
-              <Paper px="md" py="xs" radius="xl" style={{ background: 'white', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <IconFlame size={20} color="#fd7e14" />
-                <Text size="lg" fw={600} c="dark">{recipe.cook_time} min cook</Text>
-              </Paper>
+              <Badge size="lg" variant="white" color="orange" leftSection={<IconFlame size={14} />}>
+                {recipe.cook_time}m cook
+              </Badge>
             )}
             {recipe.servings && (
-              <Paper px="md" py="xs" radius="xl" style={{ background: 'white', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <IconUsers size={20} color="#fd7e14" />
-                <Text size="lg" fw={600} c="dark">Serves {recipe.servings}</Text>
-              </Paper>
+              <Badge size="lg" variant="white" color="orange" leftSection={<IconUsers size={14} />}>
+                Serves {recipe.servings}
+              </Badge>
             )}
           </Group>
         </Group>

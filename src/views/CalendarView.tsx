@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Text,
@@ -50,13 +50,17 @@ export default function CalendarView() {
   const [offset, setOffset] = useState(0);
   const [viewMode, setViewMode] = useState<ViewMode>('month');
 
-  const getDates = () => {
+  // Memoize dates calculation
+  const { dates, viewStartStr } = useMemo(() => {
     const start = dayjs().startOf('week').add(offset * 7, 'day');
     const numDays = viewMode === '1week' ? 7 : viewMode === '2weeks' ? 14 : 35;
-    return Array.from({ length: numDays }, (_, i) => start.add(i, 'day'));
-  };
+    const dateArray = Array.from({ length: numDays }, (_, i) => start.add(i, 'day'));
+    return { 
+      dates: dateArray, 
+      viewStartStr: start.format('YYYY-MM-DD')
+    };
+  }, [offset, viewMode]);
 
-  const dates = getDates();
   const viewStart = dates[0];
   const viewEnd = dates[dates.length - 1];
 
@@ -64,8 +68,7 @@ export default function CalendarView() {
     try {
       setLoading(true);
       const days = viewMode === '1week' ? 14 : viewMode === '2weeks' ? 21 : 42;
-      const fromDate = viewStart.format('YYYY-MM-DD');
-      const res = await fetch(`/api/calendar?days=${days}&from=${fromDate}`);
+      const res = await fetch(`/api/calendar?days=${days}&from=${viewStartStr}`);
       const data = await res.json();
       setEvents(data.events || []);
     } catch (err) {
@@ -73,7 +76,7 @@ export default function CalendarView() {
     } finally {
       setLoading(false);
     }
-  }, [offset, viewMode, viewStart]);
+  }, [viewMode, viewStartStr]);
 
   useEffect(() => {
     loadEvents();
@@ -82,16 +85,17 @@ export default function CalendarView() {
   }, [loadEvents]);
 
   const getEventsForDate = (date: dayjs.Dayjs) => {
+    const dateStr = date.format('YYYY-MM-DD');
     return events.filter(event => {
-      const eventStart = dayjs(event.start);
-      const eventEnd = dayjs(event.end);
+      // Parse event times and convert to local date strings for comparison
+      const eventStartLocal = dayjs(event.start).format('YYYY-MM-DD');
+      const eventEndLocal = dayjs(event.end).format('YYYY-MM-DD');
       
       if (event.allDay) {
-        // All-day events: check if date falls within range
-        return date.isSame(eventStart, 'day') || 
-               (date.isAfter(eventStart, 'day') && date.isBefore(eventEnd, 'day'));
+        // All-day events: check if date falls within range (end date is exclusive)
+        return dateStr >= eventStartLocal && dateStr < eventEndLocal;
       }
-      return eventStart.isSame(date, 'day');
+      return eventStartLocal === dateStr;
     });
   };
 
@@ -236,14 +240,13 @@ export default function CalendarView() {
                     <Text 
                       size={compact ? 'md' : 'xl'}
                       fw={700} 
-                      c={today ? 'cyan' : 'dark'}
                       style={{
                         width: compact ? 28 : 36,
                         height: compact ? 28 : 36,
                         lineHeight: compact ? '28px' : '36px',
                         borderRadius: '50%',
                         background: today ? '#06b6d4' : 'transparent',
-                        color: today ? 'white' : undefined,
+                        color: today ? '#ffffff' : '#1e293b',
                         margin: '0 auto',
                         fontSize: compact ? 14 : undefined,
                       }}
@@ -266,10 +269,12 @@ export default function CalendarView() {
                           key={event.id}
                           p={compact ? 4 : 6}
                           style={{
-                            background: 'white',
+                            background: today ? '#ffffff' : '#f8fafc',
                             borderRadius: compact ? 6 : 8,
                             borderLeft: `3px solid ${event.color ? colorMap[event.color] || '#06b6d4' : '#06b6d4'}`,
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                            boxShadow: today 
+                              ? '0 2px 6px rgba(0,0,0,0.15)' 
+                              : '0 1px 3px rgba(0,0,0,0.08)',
                           }}
                         >
                           <Text size="xs" fw={600} lineClamp={1} style={{ fontSize: compact ? 11 : 12 }}>

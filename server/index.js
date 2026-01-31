@@ -1672,6 +1672,170 @@ app.delete('/api/recipes/:id', async (req, res) => {
   }
 });
 
+// Search for recipes on the web (uses AI to search)
+app.post('/api/recipes/search', async (req, res) => {
+  try {
+    const { query } = req.body;
+    if (!query) {
+      return res.status(400).json({ error: 'Query required' });
+    }
+    
+    // Use AI to search and return recipe results
+    const searchPrompt = `Search the web for "${query} recipe" and return 6-8 recipe results.
+
+Return ONLY valid JSON array in this exact format, nothing else:
+[
+  {"title": "Recipe Name", "url": "https://...", "description": "Brief description of the recipe", "source": "website.com"}
+]
+
+Focus on popular recipe sites like allrecipes, taste.com.au, delish, foodnetwork, bbcgoodfood, etc.
+Make sure URLs are real, valid recipe page URLs.`;
+
+    const aiRes = await fetch('http://127.0.0.1:18789/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (process.env.CLAWDBOT_TOKEN || ''),
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-3-5-haiku-latest',
+        messages: [{ role: 'user', content: searchPrompt }],
+        max_tokens: 1500
+      })
+    });
+    
+    if (!aiRes.ok) {
+      throw new Error(`Search failed: ${aiRes.status}`);
+    }
+    
+    const aiData = await aiRes.json();
+    const aiContent = aiData.choices?.[0]?.message?.content || '[]';
+    
+    // Parse the JSON array from the response
+    const jsonMatch = aiContent.match(/\[[\s\S]*\]/);
+    const results = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+    
+    res.json({ results });
+  } catch (err) {
+    console.error('Error searching recipes:', err);
+    res.status(500).json({ error: 'Search failed' });
+  }
+});
+
+// Import recipe from URL
+app.post('/api/recipes/import', async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ error: 'URL required' });
+    }
+    
+    // Fetch the page content
+    const pageRes = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChoreChartBot/1.0)' }
+    });
+    
+    if (!pageRes.ok) {
+      throw new Error(`Failed to fetch page: ${pageRes.status}`);
+    }
+    
+    const html = await pageRes.text();
+    
+    // Extract text content (basic HTML stripping)
+    const textContent = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .substring(0, 15000); // Limit content size
+    
+    // Use Claude to extract recipe data
+    const extractionPrompt = `Extract the recipe from this webpage content. Return ONLY valid JSON in this exact format, nothing else:
+{
+  "title": "Recipe Name",
+  "description": "Brief description",
+  "prep_time": 15,
+  "cook_time": 30,
+  "servings": 4,
+  "ingredients": ["ingredient 1", "ingredient 2"],
+  "instructions": ["step 1", "step 2"],
+  "tags": ["tag1", "tag2"]
+}
+
+Use null for any fields you can't find. For ingredients and instructions, extract ALL of them as arrays of strings.
+Times should be numbers (minutes). Tags should be categories like "Quick", "Healthy", "Italian", etc.
+
+Webpage content:
+${textContent}`;
+
+    const aiRes = await fetch('http://127.0.0.1:18789/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (process.env.CLAWDBOT_TOKEN || ''),
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-3-5-haiku-latest',
+        messages: [{ role: 'user', content: extractionPrompt }],
+        max_tokens: 2000
+      })
+    });
+    
+    if (!aiRes.ok) {
+      throw new Error(`AI extraction failed: ${aiRes.status}`);
+    }
+    
+    const aiData = await aiRes.json();
+    const aiContent = aiData.choices?.[0]?.message?.content || '';
+    
+    // Parse the JSON from the response
+    const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Could not parse recipe from page');
+    }
+    
+    const recipe = JSON.parse(jsonMatch[0]);
+    
+    // Pick an appropriate icon based on tags or title
+    const iconMap = {
+      'pasta': '🍝', 'italian': '🍝', 'spaghetti': '🍝',
+      'pizza': '🍕',
+      'burger': '🍔',
+      'taco': '🌮', 'mexican': '🌮',
+      'asian': '🥡', 'chinese': '🥡', 'stir fry': '🥡',
+      'curry': '🍛', 'indian': '🍛',
+      'soup': '🍲',
+      'chicken': '🍗',
+      'fish': '🐟', 'seafood': '🐟',
+      'salad': '🥗',
+      'bbq': '🍖', 'grill': '🍖',
+      'breakfast': '🍳',
+      'dessert': '🍰', 'cake': '🍰',
+    };
+    
+    let icon = '🍽️';
+    const searchText = `${recipe.title || ''} ${(recipe.tags || []).join(' ')}`.toLowerCase();
+    for (const [keyword, emoji] of Object.entries(iconMap)) {
+      if (searchText.includes(keyword)) {
+        icon = emoji;
+        break;
+      }
+    }
+    
+    // Return the extracted recipe for preview (don't save yet)
+    res.json({
+      recipe: {
+        ...recipe,
+        icon,
+        source_url: url,
+      }
+    });
+  } catch (err) {
+    console.error('Error importing recipe:', err);
+    res.status(500).json({ error: err.message || 'Import failed' });
+  }
+});
+
 // Get dinner plan for a week
 app.get('/api/dinner-plan', async (req, res) => {
   try {
@@ -2621,25 +2785,41 @@ app.get('/api/calendar', async (req, res) => {
     const days = parseInt(req.query.days) || 14;
     const from = req.query.from; // Optional start date (YYYY-MM-DD)
     
-    let startDate, endDate;
+    // Use date strings for comparison to avoid timezone issues
+    let startDateStr, endDateStr;
     if (from) {
-      startDate = new Date(from);
-      endDate = new Date(from);
+      startDateStr = from; // YYYY-MM-DD
+      const endDate = new Date(from);
       endDate.setDate(endDate.getDate() + days);
+      endDateStr = endDate.toISOString().split('T')[0];
     } else {
-      startDate = new Date();
+      const now = new Date();
+      const startDate = new Date(now);
       startDate.setDate(startDate.getDate() - 1);
-      endDate = new Date();
+      startDateStr = startDate.toISOString().split('T')[0];
+      const endDate = new Date(now);
       endDate.setDate(endDate.getDate() + days);
+      endDateStr = endDate.toISOString().split('T')[0];
     }
     
+    // Query events that either:
+    // 1. Start within the date range, OR
+    // 2. Are multi-day events that overlap the date range (started before but end after start)
     const result = await pool.query(`
       SELECT google_id as id, title, start_time as start, end_time as end, 
              all_day as "allDay", location, description, color_id as color
       FROM calendar_events
-      WHERE start_time >= $1 AND start_time <= $2
+      WHERE (
+        -- Events starting in range
+        DATE(start_time AT TIME ZONE 'Australia/Sydney') >= $1 
+        AND DATE(start_time AT TIME ZONE 'Australia/Sydney') <= $2
+      ) OR (
+        -- Multi-day events that started before but overlap our range
+        DATE(start_time AT TIME ZONE 'Australia/Sydney') < $1
+        AND DATE(end_time AT TIME ZONE 'Australia/Sydney') > $1
+      )
       ORDER BY start_time
-    `, [startDate.toISOString(), endDate.toISOString()]);
+    `, [startDateStr, endDateStr]);
     
     res.json({ events: result.rows });
   } catch (err) {
