@@ -385,85 +385,62 @@ export default function AdminView() {
 
   return (
     <Box 
-      className="admin-container safe-area-padding"
       style={{ 
         height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column',
+        display: 'grid',
+        gridTemplateRows: '70px auto 1fr',
+        gap: 2,
+        background: '#e2e8f0',
+        borderRadius: 16,
         overflow: 'hidden',
       }}
     >
       {/* Header */}
-      <Paper p="lg" mb="xl" radius="xl" shadow="sm">
-        <Group justify="space-between" wrap="wrap" gap="md">
-          <Group gap="md">
-            <ActionIcon 
-              component={Link} 
-              to="/" 
-              variant="light" 
-              size="xl" 
-              radius="xl"
-            >
-              <IconArrowLeft size={22} />
-            </ActionIcon>
-            <div>
-              <Title order={2} fw={800}>⚙️ Admin Panel</Title>
-              <Text size="sm" c="dimmed">Manage your family chore chart</Text>
-            </div>
-          </Group>
-          <Button 
-            variant="subtle" 
-            color="gray" 
-            onClick={handleLogout}
+      <Box
+        style={{
+          background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 20px',
+        }}
+      >
+        <Group gap="md">
+          <ActionIcon 
+            component={Link} 
+            to="/" 
+            variant="white"
+            size={40}
             radius="xl"
           >
-            Logout
-          </Button>
+            <IconArrowLeft size={20} />
+          </ActionIcon>
+          <Title order={2} c="white" fw={800}>⚙️ Admin Panel</Title>
         </Group>
-      </Paper>
+        <Button 
+          variant="white" 
+          color="dark"
+          onClick={handleLogout}
+          radius="xl"
+          size="sm"
+        >
+          Logout
+        </Button>
+      </Box>
 
-      <Tabs defaultValue="members" variant="pills" radius="xl" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <ScrollArea scrollbarSize={0} style={{ flexShrink: 0 }}>
-          <Tabs.List mb="md" style={{ flexWrap: 'nowrap' }}>
-            <Tabs.Tab 
-              value="members" 
-              leftSection={<IconUsers size={18} />}
-              style={{ fontWeight: 600 }}
-            >
-              Family
-            </Tabs.Tab>
-            <Tabs.Tab 
-              value="chores" 
-              leftSection={<IconChecklist size={18} />}
-              style={{ fontWeight: 600 }}
-            >
-              Chores
-            </Tabs.Tab>
-            <Tabs.Tab 
-              value="assignments" 
-              leftSection={<IconCalendar size={18} />}
-              style={{ fontWeight: 600 }}
-            >
-              Schedule
-            </Tabs.Tab>
-            <Tabs.Tab 
-              value="history" 
-              leftSection={<IconHistory size={18} />}
-              style={{ fontWeight: 600 }}
-            >
-              History
-            </Tabs.Tab>
-            <Tabs.Tab 
-              value="settings" 
-              leftSection={<IconSettings size={18} />}
-              style={{ fontWeight: 600 }}
-            >
-              Settings
-            </Tabs.Tab>
+      {/* Tab Navigation */}
+      <Tabs defaultValue="members" variant="pills" radius="xl" style={{ display: 'contents' }}>
+        <Box style={{ background: '#f8fafc', padding: '12px 16px', display: 'flex', gap: 8, overflowX: 'auto' }}>
+          <Tabs.List style={{ flexWrap: 'nowrap', gap: 8 }}>
+            <Tabs.Tab value="members" leftSection={<IconUsers size={16} />}>Family</Tabs.Tab>
+            <Tabs.Tab value="chores" leftSection={<IconChecklist size={16} />}>Chores</Tabs.Tab>
+            <Tabs.Tab value="assignments" leftSection={<IconCalendar size={16} />}>Schedule</Tabs.Tab>
+            <Tabs.Tab value="history" leftSection={<IconHistory size={16} />}>History</Tabs.Tab>
+            <Tabs.Tab value="settings" leftSection={<IconSettings size={16} />}>Bonus Tasks</Tabs.Tab>
           </Tabs.List>
-        </ScrollArea>
+        </Box>
 
-        <ScrollArea style={{ flex: 1 }} scrollbarSize={8}>
+        <ScrollArea style={{ background: '#ffffff', padding: 16 }} scrollbarSize={8}>
         {/* FAMILY MEMBERS TAB */}
         <Tabs.Panel value="members">
           <Group justify="space-between" mb="lg">
