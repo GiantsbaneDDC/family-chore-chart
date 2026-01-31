@@ -2584,39 +2584,23 @@ If you need data, use an action first. After action results, give a friendly res
   }
 });
 
-// ================== CALENDAR API (via gog) ==================
+// ================== CALENDAR API (from synced database) ==================
 
-// GET /api/calendar - Get calendar events
+// GET /api/calendar - Get calendar events from local DB
 app.get('/api/calendar', async (req, res) => {
   try {
-    const days = parseInt(req.query.days) || 7;
-    const today = new Date();
-    const endDate = new Date(today);
-    endDate.setDate(endDate.getDate() + days);
+    const days = parseInt(req.query.days) || 14;
     
-    const fromStr = today.toISOString().split('T')[0];
-    const toStr = endDate.toISOString().split('T')[0];
+    const result = await pool.query(`
+      SELECT google_id as id, title, start_time as start, end_time as end, 
+             all_day as "allDay", location, description, color_id as color
+      FROM calendar_events
+      WHERE start_time >= NOW() - INTERVAL '1 day'
+        AND start_time <= NOW() + INTERVAL '${days} days'
+      ORDER BY start_time
+    `);
     
-    const { stdout } = await execPromise(
-      `gog calendar events primary --from ${fromStr} --to ${toStr} --json`,
-      { env: { ...process.env, GOG_ACCOUNT: 'tinyerinandmatt@gmail.com' } }
-    );
-    
-    const data = JSON.parse(stdout);
-    
-    // Transform events for the frontend
-    const events = (data.events || []).map(event => ({
-      id: event.id,
-      title: event.summary || 'No title',
-      start: event.start?.dateTime || event.start?.date,
-      end: event.end?.dateTime || event.end?.date,
-      allDay: !event.start?.dateTime,
-      location: event.location || null,
-      description: event.description || null,
-      color: event.colorId || null,
-    }));
-    
-    res.json({ events });
+    res.json({ events: result.rows });
   } catch (err) {
     console.error('Calendar error:', err);
     res.status(500).json({ error: 'Failed to fetch calendar', events: [] });
@@ -2626,33 +2610,33 @@ app.get('/api/calendar', async (req, res) => {
 // GET /api/calendar/today - Get just today's events
 app.get('/api/calendar/today', async (req, res) => {
   try {
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const result = await pool.query(`
+      SELECT google_id as id, title, start_time as start, end_time as end,
+             all_day as "allDay", location
+      FROM calendar_events
+      WHERE DATE(start_time AT TIME ZONE 'Australia/Sydney') = CURRENT_DATE
+         OR (all_day = true AND start_time::date <= CURRENT_DATE AND end_time::date > CURRENT_DATE)
+      ORDER BY all_day DESC, start_time
+    `);
     
-    const fromStr = today.toISOString().split('T')[0];
-    const toStr = tomorrow.toISOString().split('T')[0];
-    
-    const { stdout } = await execPromise(
-      `gog calendar events primary --from ${fromStr} --to ${toStr} --json`,
-      { env: { ...process.env, GOG_ACCOUNT: 'tinyerinandmatt@gmail.com' } }
-    );
-    
-    const data = JSON.parse(stdout);
-    
-    const events = (data.events || []).map(event => ({
-      id: event.id,
-      title: event.summary || 'No title',
-      start: event.start?.dateTime || event.start?.date,
-      end: event.end?.dateTime || event.end?.date,
-      allDay: !event.start?.dateTime,
-      location: event.location || null,
-    }));
-    
-    res.json({ events });
+    res.json({ events: result.rows });
   } catch (err) {
     console.error('Calendar error:', err);
     res.status(500).json({ error: 'Failed to fetch calendar', events: [] });
+  }
+});
+
+// POST /api/calendar/sync - Manual sync trigger
+app.post('/api/calendar/sync', async (req, res) => {
+  try {
+    const { stdout, stderr } = await execPromise(
+      'node /home/matt/clawd/chore-chart/server/sync-calendar.js',
+      { timeout: 30000 }
+    );
+    res.json({ success: true, output: stdout });
+  } catch (err) {
+    console.error('Sync error:', err);
+    res.status(500).json({ error: 'Sync failed', message: err.message });
   }
 });
 
