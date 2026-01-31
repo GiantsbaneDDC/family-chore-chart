@@ -215,8 +215,18 @@ export default function HomeView() {
   const pendingVoiceRef = useRef<string | null>(null);
 
   const toggleListening = () => {
+    // Check if we're on HTTPS or localhost (required for microphone)
+    const isSecure = window.location.protocol === 'https:' || 
+                     window.location.hostname === 'localhost' || 
+                     window.location.hostname === '127.0.0.1';
+    
+    if (!isSecure) {
+      alert('Voice input requires HTTPS. For now, please type your message or access via localhost.');
+      return;
+    }
+    
     if (!recognitionRef.current) {
-      alert('Speech recognition not supported in this browser');
+      alert('Speech recognition not supported in this browser. Try Chrome or Edge.');
       return;
     }
     
@@ -225,7 +235,13 @@ export default function HomeView() {
       setIsListening(false);
     } else {
       setIsListening(true);
-      recognitionRef.current.start();
+      try {
+        recognitionRef.current.start();
+      } catch (err) {
+        console.error('Speech recognition error:', err);
+        setIsListening(false);
+        alert('Could not start voice input. Please check microphone permissions.');
+      }
     }
   };
 

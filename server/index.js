@@ -3,6 +3,9 @@ const cors = require('cors');
 const path = require('path');
 const session = require('express-session');
 const crypto = require('crypto');
+const https = require('https');
+const http = require('http');
+const fs = require('fs');
 const { Pool } = require('pg');
 require('dotenv').config();
 
@@ -1855,8 +1858,27 @@ app.get('*', (req, res) => {
   }
 });
 
-// Start server
+// Start server(s)
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Chore Chart server running on port ${PORT}`);
+const HTTPS_PORT = process.env.HTTPS_PORT || 8443;
+
+// Try to load SSL certificates for HTTPS
+const certPath = path.join(__dirname, 'cert.pem');
+const keyPath = path.join(__dirname, 'key.pem');
+
+if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+  // Start HTTPS server
+  const httpsOptions = {
+    key: fs.readFileSync(keyPath),
+    cert: fs.readFileSync(certPath)
+  };
+  
+  https.createServer(httpsOptions, app).listen(HTTPS_PORT, () => {
+    console.log(`Chore Chart HTTPS server running on port ${HTTPS_PORT}`);
+  });
+}
+
+// Always start HTTP server too
+http.createServer(app).listen(PORT, () => {
+  console.log(`Chore Chart HTTP server running on port ${PORT}`);
 });
