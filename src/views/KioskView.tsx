@@ -253,8 +253,9 @@ export default function KioskView() {
             const isToday = dayIndex === today;
             
             // Combine all items and calculate overflow
+            // Max visible based on member count: fewer members = more space per row
             const allItems = [...dayAssignments, ...memberExtraTasks.map(et => ({ ...et, isExtra: true }))];
-            const maxVisible = Math.max(2, Math.floor(100 / members.length) - 1); // Dynamic based on member count
+            const maxVisible = members.length <= 3 ? 4 : members.length <= 5 ? 3 : 2;
             const visibleItems = allItems.slice(0, maxVisible);
             const hiddenCount = allItems.length - visibleItems.length;
 
