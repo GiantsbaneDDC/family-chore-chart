@@ -48,7 +48,7 @@ export default function CalendarView() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [offset, setOffset] = useState(0);
-  const [viewMode, setViewMode] = useState<ViewMode>('2weeks');
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
 
   const getDates = () => {
     const start = dayjs().startOf('week').add(offset * 7, 'day');
