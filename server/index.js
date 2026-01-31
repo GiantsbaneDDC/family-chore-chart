@@ -1883,7 +1883,7 @@ const assistantActions = {
     return { success: true, recipes: result.rows };
   },
 
-  async set_dinner({ recipe_name, day }) {
+  async set_dinner({ recipe_name, day, week = 'this' }) {
     if (!recipe_name || day === undefined) {
       return { success: false, error: 'Need recipe name and day' };
     }
@@ -1894,24 +1894,43 @@ const assistantActions = {
     const recipe = await pool.query('SELECT id, title FROM recipes WHERE LOWER(title) LIKE $1', [`%${recipe_name.toLowerCase()}%`]);
     if (recipe.rows.length === 0) return { success: false, error: `No recipe found matching "${recipe_name}"` };
     
-    const weekStart = getWeekStart();
+    // Support "this" or "next" week
+    let weekStart;
+    if (week === 'next') {
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      weekStart = getWeekStart(nextWeek);
+    } else {
+      weekStart = getWeekStart();
+    }
+    
     await pool.query(
       `INSERT INTO dinner_plans (recipe_id, day_of_week, week_start) VALUES ($1, $2, $3)
        ON CONFLICT (day_of_week, week_start) DO UPDATE SET recipe_id = $1`,
       [recipe.rows[0].id, dayIndex, weekStart]
     );
-    return { success: true, message: `Set ${days[dayIndex]}'s dinner to "${recipe.rows[0].title}"` };
+    const weekLabel = week === 'next' ? 'next ' : '';
+    return { success: true, message: `Set ${weekLabel}${days[dayIndex]}'s dinner to "${recipe.rows[0].title}"` };
   },
 
-  async clear_dinner({ day }) {
+  async clear_dinner({ day, week = 'this' }) {
     if (day === undefined) return { success: false, error: 'Need day to clear' };
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const dayIndex = typeof day === 'number' ? day : days.indexOf(day.toLowerCase());
     if (dayIndex < 0 || dayIndex > 6) return { success: false, error: 'Invalid day' };
     
-    const weekStart = getWeekStart();
+    let weekStart;
+    if (week === 'next') {
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      weekStart = getWeekStart(nextWeek);
+    } else {
+      weekStart = getWeekStart();
+    }
+    
     await pool.query('DELETE FROM dinner_plans WHERE day_of_week = $1 AND week_start = $2', [dayIndex, weekStart]);
-    return { success: true, message: `Cleared dinner plan for ${days[dayIndex]}` };
+    const weekLabel = week === 'next' ? 'next ' : '';
+    return { success: true, message: `Cleared dinner plan for ${weekLabel}${days[dayIndex]}` };
   },
 
   // ---- FAMILY ACTIONS ----
@@ -1974,8 +1993,13 @@ app.post('/api/chat', async (req, res) => {
     const todayDow = new Date().getDay();
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     
+    // Calculate next week start
+    const nextWeekDate = new Date();
+    nextWeekDate.setDate(nextWeekDate.getDate() + 7);
+    const nextWeekStart = getWeekStart(nextWeekDate);
+    
     // Gather context data
-    const [membersResult, choreStats, dinnerPlan, leaderboard] = await Promise.all([
+    const [membersResult, choreStats, dinnerPlan, nextWeekDinnerPlan, leaderboard] = await Promise.all([
       pool.query('SELECT name, avatar, total_stars FROM family_members ORDER BY name'),
       pool.query(`
         SELECT m.name, m.avatar, COUNT(a.id) as total, COUNT(c.id) as done
@@ -1989,6 +2013,11 @@ app.post('/api/chat', async (req, res) => {
         FROM dinner_plans dp JOIN recipes r ON dp.recipe_id = r.id
         WHERE dp.week_start = $1 ORDER BY dp.day_of_week
       `, [weekStart]),
+      pool.query(`
+        SELECT dp.day_of_week, r.title, r.icon
+        FROM dinner_plans dp JOIN recipes r ON dp.recipe_id = r.id
+        WHERE dp.week_start = $1 ORDER BY dp.day_of_week
+      `, [nextWeekStart]),
       pool.query('SELECT name, avatar, total_stars FROM family_members ORDER BY total_stars DESC')
     ]);
     
@@ -2019,11 +2048,17 @@ ${choreStats.rows.filter(m => parseInt(m.total) > 0).map(m => `  ${m.avatar} ${m
 
 AVAILABLE CHORES: ${allChores.rows.map(c => `${c.icon} ${c.title}`).join(', ')}
 
-DINNER PLAN THIS WEEK:
+DINNER PLAN THIS WEEK (week of ${weekStart}):
 ${days.map((day, i) => {
   const plan = dinnerPlan.rows.find(r => r.day_of_week === i);
   const isToday = i === todayDow;
   return `  ${isToday ? '👉 ' : ''}${day}: ${plan ? `${plan.icon} ${plan.title}` : 'Not planned'}`;
+}).join('\n')}
+
+DINNER PLAN NEXT WEEK (week of ${nextWeekStart}):
+${days.map((day, i) => {
+  const plan = nextWeekDinnerPlan.rows.find(r => r.day_of_week === i);
+  return `  ${day}: ${plan ? `${plan.icon} ${plan.title}` : 'Not planned'}`;
 }).join('\n')}
 
 AVAILABLE RECIPES: ${allRecipes.rows.map(r => `${r.icon} ${r.title}`).join(', ')}
@@ -2046,8 +2081,8 @@ Actions you can use:
 - unassign_chore: Remove assignment. Params: chore_name, member_name, day
 - complete_chore: Mark done (today only). Params: chore_name, member_name
 - add_recipe: Add new recipe. Params: title (required), icon, description, prep_time, cook_time, ingredients (array), instructions (array)
-- set_dinner: Set meal for a day. Params: recipe_name, day
-- clear_dinner: Remove meal plan. Params: day
+- set_dinner: Set meal for a day. Params: recipe_name, day, week ("this" or "next", default "this")
+- clear_dinner: Remove meal plan. Params: day, week ("this" or "next", default "this")
 - award_stars: Give bonus stars. Params: member_name, stars (number)
 
 GUIDELINES:
