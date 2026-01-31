@@ -362,10 +362,20 @@ export default function HomeView() {
     setShowWelcome(false);
 
     try {
+      // Include recent conversation history for context (last 10 messages)
+      const recentHistory = messages.slice(-10).map(m => ({
+        role: m.role,
+        content: m.content
+      }));
+      
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage.content, voice: true }),
+        body: JSON.stringify({ 
+          message: userMessage.content, 
+          voice: true,
+          history: recentHistory
+        }),
       });
 
       const data = await response.json();

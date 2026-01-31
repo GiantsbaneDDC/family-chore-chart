@@ -1967,7 +1967,7 @@ async function executeAction(actionName, params) {
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, voice = true } = req.body;
+    const { message, voice = true, history = [] } = req.body;
     
     // Get current family data for context
     const weekStart = getWeekStart();
@@ -2069,6 +2069,8 @@ GUIDELINES:
         model: 'clawdbot',
         messages: [
           { role: 'system', content: context },
+          // Include conversation history for context
+          ...history.map(m => ({ role: m.role, content: m.content })),
           { role: 'user', content: message }
         ],
         max_tokens: 500
