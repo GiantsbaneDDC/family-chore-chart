@@ -30,6 +30,7 @@ import {
   IconVolume,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
+import ReactMarkdown from 'react-markdown';
 import * as api from '../api';
 import { celebrateCompletion, playSuccess } from '../utils/effects';
 
@@ -792,13 +793,36 @@ export default function HomeView() {
                       {msg.role === 'user' ? 'You' : 'Assistant'} · {dayjs(msg.timestamp).format('h:mm A')}
                     </Text>
                   </Group>
-                  <Text 
-                    c={msg.role === 'user' ? 'white' : 'dark'}
-                    size="md"
-                    style={{ whiteSpace: 'pre-wrap' }}
-                  >
-                    {msg.content}
-                  </Text>
+                  {msg.role === 'assistant' ? (
+                    <Box
+                      style={{
+                        color: 'var(--mantine-color-dark-9)',
+                        fontSize: '1rem',
+                        lineHeight: 1.5,
+                      }}
+                      className="markdown-content"
+                    >
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }) => <Text size="md" mb="xs">{children}</Text>,
+                          strong: ({ children }) => <Text span fw={700}>{children}</Text>,
+                          em: ({ children }) => <Text span fs="italic">{children}</Text>,
+                          ul: ({ children }) => <Box component="ul" pl="md" my="xs">{children}</Box>,
+                          ol: ({ children }) => <Box component="ol" pl="md" my="xs">{children}</Box>,
+                          li: ({ children }) => <Text component="li" size="md" mb={4}>{children}</Text>,
+                          h1: ({ children }) => <Title order={3} mb="xs">{children}</Title>,
+                          h2: ({ children }) => <Title order={4} mb="xs">{children}</Title>,
+                          h3: ({ children }) => <Title order={5} mb="xs">{children}</Title>,
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    </Box>
+                  ) : (
+                    <Text c="white" size="md" style={{ whiteSpace: 'pre-wrap' }}>
+                      {msg.content}
+                    </Text>
+                  )}
                 </Paper>
               </Box>
             ))}
