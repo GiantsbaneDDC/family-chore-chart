@@ -379,7 +379,15 @@ export default function AdminView() {
   }
 
   return (
-    <Box className="admin-container safe-area-padding">
+    <Box 
+      className="admin-container safe-area-padding"
+      style={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
       {/* Header */}
       <Paper p="lg" mb="xl" radius="xl" shadow="sm">
         <Group justify="space-between" wrap="wrap" gap="md">
@@ -409,9 +417,9 @@ export default function AdminView() {
         </Group>
       </Paper>
 
-      <Tabs defaultValue="members" variant="pills" radius="xl">
-        <ScrollArea scrollbarSize={0}>
-          <Tabs.List mb="xl" style={{ flexWrap: 'nowrap' }}>
+      <Tabs defaultValue="members" variant="pills" radius="xl" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <ScrollArea scrollbarSize={0} style={{ flexShrink: 0 }}>
+          <Tabs.List mb="md" style={{ flexWrap: 'nowrap' }}>
             <Tabs.Tab 
               value="members" 
               leftSection={<IconUsers size={18} />}
@@ -450,6 +458,7 @@ export default function AdminView() {
           </Tabs.List>
         </ScrollArea>
 
+        <ScrollArea style={{ flex: 1 }} scrollbarSize={8}>
         {/* FAMILY MEMBERS TAB */}
         <Tabs.Panel value="members">
           <Group justify="space-between" mb="lg">
@@ -826,6 +835,7 @@ export default function AdminView() {
             )}
           </Stack>
         </Tabs.Panel>
+        </ScrollArea>
       </Tabs>
 
       {/* MEMBER MODAL */}
