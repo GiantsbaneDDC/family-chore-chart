@@ -368,7 +368,7 @@ export default function HomeView() {
         content: m.content
       }));
       
-      const response = await fetch('/api/chat', {
+      const response = await fetch('/api/chat/v2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -391,7 +391,7 @@ export default function HomeView() {
       setMessages(prev => [...prev, assistantMessage]);
       
       // If an action was performed, refresh the dashboard data
-      if (data.actionResult?.success) {
+      if (data.actionPerformed) {
         loadStats();
       }
       

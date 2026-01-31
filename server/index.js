@@ -1750,7 +1750,284 @@ app.post('/api/dinner-plan/copy-week', async (req, res) => {
   }
 });
 
-// ================== ASSISTANT ACTIONS ==================
+// ================== ASSISTANT API (for Clawdbot skill) ==================
+
+// GET /api/assistant/family - Get family members
+app.get('/api/assistant/family', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT name, avatar, total_stars as stars FROM family_members ORDER BY name');
+    res.json({ members: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/assistant/chores/today - Get today's chores with completion status
+app.get('/api/assistant/chores/today', async (req, res) => {
+  try {
+    const weekStart = getWeekStart();
+    const todayDow = new Date().getDay();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    const result = await pool.query(`
+      SELECT m.name as member, m.avatar, c.title as chore, c.icon,
+             CASE WHEN comp.id IS NOT NULL THEN true ELSE false END as done
+      FROM assignments a
+      JOIN family_members m ON a.member_id = m.id
+      JOIN chores c ON a.chore_id = c.id
+      LEFT JOIN completions comp ON a.id = comp.assignment_id AND comp.week_start = $1
+      WHERE a.day_of_week = $2
+      ORDER BY m.name, c.title
+    `, [weekStart, todayDow]);
+    
+    res.json({ today: days[todayDow], chores: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/assistant/dinner - Get dinner plan
+app.get('/api/assistant/dinner', async (req, res) => {
+  try {
+    const week = req.query.week || 'this';
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    let weekStart;
+    if (week === 'next') {
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      weekStart = getWeekStart(nextWeek);
+    } else {
+      weekStart = getWeekStart();
+    }
+    
+    const result = await pool.query(`
+      SELECT dp.day_of_week, r.title, r.icon
+      FROM dinner_plans dp JOIN recipes r ON dp.recipe_id = r.id
+      WHERE dp.week_start = $1 ORDER BY dp.day_of_week
+    `, [weekStart]);
+    
+    const plan = days.map((day, i) => {
+      const meal = result.rows.find(r => r.day_of_week === i);
+      return { day, meal: meal ? `${meal.icon} ${meal.title}` : null };
+    });
+    
+    res.json({ week, plan });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/assistant/recipes - Get all recipes
+app.get('/api/assistant/recipes', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT title, icon FROM recipes ORDER BY title');
+    res.json({ recipes: result.rows.map(r => `${r.icon} ${r.title}`) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/assistant/chores - Get all chores
+app.get('/api/assistant/chores', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT title, icon, points FROM chores ORDER BY title');
+    res.json({ chores: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/assistant/chores - Add a chore
+app.post('/api/assistant/chores', async (req, res) => {
+  try {
+    const { title, icon = '📋', points = 1 } = req.body;
+    if (!title) return res.status(400).json({ error: 'Title required' });
+    
+    await pool.query('INSERT INTO chores (title, icon, points) VALUES ($1, $2, $3)', [title, icon, points]);
+    res.json({ success: true, message: `Added chore "${title}"` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/assistant/assign - Assign a chore
+app.post('/api/assistant/assign', async (req, res) => {
+  try {
+    const { chore, member, day } = req.body;
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayIndex = days.indexOf(day.toLowerCase());
+    if (dayIndex < 0) return res.status(400).json({ error: 'Invalid day' });
+    
+    const choreResult = await pool.query('SELECT id, title FROM chores WHERE LOWER(title) LIKE $1', [`%${chore.toLowerCase()}%`]);
+    if (choreResult.rows.length === 0) return res.status(404).json({ error: `No chore matching "${chore}"` });
+    
+    const memberResult = await pool.query('SELECT id, name FROM family_members WHERE LOWER(name) LIKE $1', [`%${member.toLowerCase()}%`]);
+    if (memberResult.rows.length === 0) return res.status(404).json({ error: `No member matching "${member}"` });
+    
+    await pool.query(
+      'INSERT INTO assignments (chore_id, member_id, day_of_week) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+      [choreResult.rows[0].id, memberResult.rows[0].id, dayIndex]
+    );
+    res.json({ success: true, message: `Assigned "${choreResult.rows[0].title}" to ${memberResult.rows[0].name} on ${days[dayIndex]}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/assistant/unassign - Remove assignment
+app.post('/api/assistant/unassign', async (req, res) => {
+  try {
+    const { chore, member, day } = req.body;
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayIndex = days.indexOf(day.toLowerCase());
+    if (dayIndex < 0) return res.status(400).json({ error: 'Invalid day' });
+    
+    const choreResult = await pool.query('SELECT id FROM chores WHERE LOWER(title) LIKE $1', [`%${chore.toLowerCase()}%`]);
+    const memberResult = await pool.query('SELECT id FROM family_members WHERE LOWER(name) LIKE $1', [`%${member.toLowerCase()}%`]);
+    
+    if (choreResult.rows.length && memberResult.rows.length) {
+      await pool.query(
+        'DELETE FROM assignments WHERE chore_id = $1 AND member_id = $2 AND day_of_week = $3',
+        [choreResult.rows[0].id, memberResult.rows[0].id, dayIndex]
+      );
+    }
+    res.json({ success: true, message: 'Removed assignment' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/assistant/complete - Mark chore complete
+app.post('/api/assistant/complete', async (req, res) => {
+  try {
+    const { chore, member } = req.body;
+    const weekStart = getWeekStart();
+    const todayDow = new Date().getDay();
+    
+    const choreResult = await pool.query('SELECT id, title, points FROM chores WHERE LOWER(title) LIKE $1', [`%${chore.toLowerCase()}%`]);
+    if (choreResult.rows.length === 0) return res.status(404).json({ error: `No chore matching "${chore}"` });
+    
+    const memberResult = await pool.query('SELECT id, name FROM family_members WHERE LOWER(name) LIKE $1', [`%${member.toLowerCase()}%`]);
+    if (memberResult.rows.length === 0) return res.status(404).json({ error: `No member matching "${member}"` });
+    
+    const assignment = await pool.query(
+      'SELECT id FROM assignments WHERE chore_id = $1 AND member_id = $2 AND day_of_week = $3',
+      [choreResult.rows[0].id, memberResult.rows[0].id, todayDow]
+    );
+    
+    if (assignment.rows.length === 0) {
+      return res.status(400).json({ error: `${memberResult.rows[0].name} doesn't have that chore today` });
+    }
+    
+    await pool.query('INSERT INTO completions (assignment_id, week_start) VALUES ($1, $2) ON CONFLICT DO NOTHING', [assignment.rows[0].id, weekStart]);
+    await pool.query('UPDATE family_members SET total_stars = total_stars + $1 WHERE id = $2', [choreResult.rows[0].points, memberResult.rows[0].id]);
+    
+    res.json({ success: true, message: `${memberResult.rows[0].name} completed "${choreResult.rows[0].title}" +${choreResult.rows[0].points} star(s)!` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/assistant/recipes - Add recipe
+app.post('/api/assistant/recipes', async (req, res) => {
+  try {
+    const { title, icon = '🍽️', description = '', prep_time, cook_time } = req.body;
+    if (!title) return res.status(400).json({ error: 'Title required' });
+    
+    await pool.query(
+      'INSERT INTO recipes (title, icon, description, prep_time, cook_time) VALUES ($1, $2, $3, $4, $5)',
+      [title, icon, description, prep_time || null, cook_time || null]
+    );
+    res.json({ success: true, message: `Added recipe "${title}"` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/assistant/dinner - Set dinner
+app.post('/api/assistant/dinner', async (req, res) => {
+  try {
+    const { recipe, day, week = 'this' } = req.body;
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayIndex = days.indexOf(day.toLowerCase());
+    if (dayIndex < 0) return res.status(400).json({ error: 'Invalid day' });
+    
+    const recipeResult = await pool.query('SELECT id, title FROM recipes WHERE LOWER(title) LIKE $1', [`%${recipe.toLowerCase()}%`]);
+    if (recipeResult.rows.length === 0) return res.status(404).json({ error: `No recipe matching "${recipe}"` });
+    
+    let weekStart;
+    if (week === 'next') {
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      weekStart = getWeekStart(nextWeek);
+    } else {
+      weekStart = getWeekStart();
+    }
+    
+    await pool.query(
+      `INSERT INTO dinner_plans (recipe_id, day_of_week, week_start) VALUES ($1, $2, $3)
+       ON CONFLICT (day_of_week, week_start) DO UPDATE SET recipe_id = $1`,
+      [recipeResult.rows[0].id, dayIndex, weekStart]
+    );
+    res.json({ success: true, message: `Set ${week === 'next' ? 'next ' : ''}${days[dayIndex]}'s dinner to "${recipeResult.rows[0].title}"` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/assistant/dinner - Clear dinner
+app.delete('/api/assistant/dinner', async (req, res) => {
+  try {
+    const { day, week = 'this' } = req.body;
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayIndex = days.indexOf(day.toLowerCase());
+    if (dayIndex < 0) return res.status(400).json({ error: 'Invalid day' });
+    
+    let weekStart;
+    if (week === 'next') {
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      weekStart = getWeekStart(nextWeek);
+    } else {
+      weekStart = getWeekStart();
+    }
+    
+    await pool.query('DELETE FROM dinner_plans WHERE day_of_week = $1 AND week_start = $2', [dayIndex, weekStart]);
+    res.json({ success: true, message: `Cleared ${week === 'next' ? 'next ' : ''}${days[dayIndex]}'s dinner` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/assistant/stars - Award stars
+app.post('/api/assistant/stars', async (req, res) => {
+  try {
+    const { member, stars } = req.body;
+    if (!stars || stars < 1) return res.status(400).json({ error: 'Need positive star count' });
+    
+    const memberResult = await pool.query('SELECT id, name, total_stars FROM family_members WHERE LOWER(name) LIKE $1', [`%${member.toLowerCase()}%`]);
+    if (memberResult.rows.length === 0) return res.status(404).json({ error: `No member matching "${member}"` });
+    
+    await pool.query('UPDATE family_members SET total_stars = total_stars + $1 WHERE id = $2', [stars, memberResult.rows[0].id]);
+    const newTotal = parseInt(memberResult.rows[0].total_stars) + stars;
+    res.json({ success: true, message: `Gave ${stars} star(s) to ${memberResult.rows[0].name}! Now has ${newTotal} stars.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/assistant/leaderboard - Get leaderboard
+app.get('/api/assistant/leaderboard', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT name, avatar, total_stars as stars FROM family_members ORDER BY total_stars DESC');
+    res.json({ leaderboard: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ================== ASSISTANT ACTIONS (legacy) ==================
 
 const { exec } = require('child_process');
 const util = require('util');
@@ -2172,6 +2449,138 @@ GUIDELINES:
   } catch (err) {
     console.error('Error in chat:', err);
     res.status(500).json({ reply: "Oops! I couldn't connect to my brain. Try again in a moment! 🤔" });
+  }
+});
+
+// ================== CHAT API V2 (Minimal context, text-based actions) ==================
+
+// Action execution - calls our own API
+async function executeTool(name, args) {
+  const apiBase = 'http://127.0.0.1:8080/api/assistant';
+  const endpoints = {
+    get_family: { method: 'GET', path: '/family' },
+    get_todays_chores: { method: 'GET', path: '/chores/today' },
+    get_dinner_plan: { method: 'GET', path: `/dinner?week=${args.week || 'this'}` },
+    get_recipes: { method: 'GET', path: '/recipes' },
+    get_chores: { method: 'GET', path: '/chores' },
+    add_chore: { method: 'POST', path: '/chores', body: args },
+    assign_chore: { method: 'POST', path: '/assign', body: args },
+    complete_chore: { method: 'POST', path: '/complete', body: args },
+    add_recipe: { method: 'POST', path: '/recipes', body: args },
+    set_dinner: { method: 'POST', path: '/dinner', body: args },
+    award_stars: { method: 'POST', path: '/stars', body: args },
+    get_leaderboard: { method: 'GET', path: '/leaderboard' }
+  };
+  
+  const ep = endpoints[name];
+  if (!ep) return { error: `Unknown tool: ${name}` };
+  
+  try {
+    const options = { method: ep.method, headers: { 'Content-Type': 'application/json' } };
+    if (ep.body) options.body = JSON.stringify(ep.body);
+    const res = await fetch(`${apiBase}${ep.path}`, options);
+    return await res.json();
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+app.post('/api/chat/v2', async (req, res) => {
+  try {
+    const { message, voice = true, history = [] } = req.body;
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const today = days[new Date().getDay()];
+    
+    // Minimal context - just what's needed
+    const context = `You are the Family Hub assistant on a kitchen tablet. Today is ${today}.
+Be brief (1-2 sentences) - spoken aloud via TTS. Be friendly. Kids use this.
+
+To perform actions, respond with JSON:
+{"action":"<name>","params":{...}}
+
+Actions: get_family, get_todays_chores, get_dinner_plan(week), get_recipes, get_chores,
+add_chore(title,icon?,points?), assign_chore(chore,member,day), complete_chore(chore,member),
+add_recipe(title,icon?,description?), set_dinner(recipe,day,week?), award_stars(member,stars), get_leaderboard
+
+If you need data, use an action first. After action results, give a friendly response.`;
+
+    let messages = [
+      { role: 'system', content: context },
+      ...history.slice(-6).map(m => ({ role: m.role, content: m.content })),
+      { role: 'user', content: message }
+    ];
+    
+    let reply = '';
+    let actionPerformed = false;
+    
+    // Loop for actions (max 3 iterations)
+    for (let i = 0; i < 3; i++) {
+      const response = await fetch('http://127.0.0.1:18789/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + (process.env.CLAWDBOT_TOKEN || '2c79636f0d115b55778772d34ad10261575935836397b7ff'),
+        },
+        body: JSON.stringify({
+          model: 'anthropic/claude-3-5-haiku-latest',
+          messages,
+          max_tokens: 200
+        })
+      });
+      
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      const data = await response.json();
+      reply = data.choices?.[0]?.message?.content || '';
+      
+      // Check for action JSON
+      const actionMatch = reply.match(/\{[\s]*"action"[\s]*:[\s]*"([^"]+)"[\s]*,?[\s]*"params"[\s]*:[\s]*(\{[^}]*\})?\s*\}/);
+      if (actionMatch) {
+        try {
+          const actionName = actionMatch[1];
+          const params = actionMatch[2] ? JSON.parse(actionMatch[2]) : {};
+          console.log(`Action: ${actionName}`, params);
+          
+          const result = await executeTool(actionName, params);
+          console.log('Result:', result);
+          
+          if (result.success) actionPerformed = true;
+          
+          // Add to messages and continue
+          messages.push({ role: 'assistant', content: reply });
+          messages.push({ role: 'user', content: `Action result: ${JSON.stringify(result)}` });
+          continue;
+        } catch (e) {
+          console.error('Action parse error:', e);
+        }
+      }
+      
+      // No action, we have final reply
+      break;
+    }
+    
+    // Clean up any leftover JSON from reply
+    reply = reply.replace(/\{[\s]*"action"[\s]*:[\s\S]*?\}/g, '').trim();
+    if (!reply) reply = "Done!";
+    
+    // Generate TTS
+    let audioUrl = null;
+    if (voice && reply) {
+      try {
+        const audioFile = `/tmp/assistant-${Date.now()}.mp3`;
+        const cleanText = reply.replace(/\*\*/g, '').replace(/[#*_~`]/g, '').replace(/\n+/g, ' ').replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
+        await execPromise(`sag -o "${audioFile}" -v IKne3meq5aSn9XLyUdCD "${cleanText.replace(/"/g, '\\"')}"`, {
+          env: { ...process.env, ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY || '' }
+        });
+        audioUrl = `/audio/${path.basename(audioFile)}`;
+      } catch (ttsErr) {
+        console.error('TTS error:', ttsErr);
+      }
+    }
+    
+    res.json({ reply, audioUrl, actionPerformed });
+  } catch (err) {
+    console.error('Chat v2 error:', err);
+    res.status(500).json({ reply: "Oops! Something went wrong. Try again!" });
   }
 });
 
