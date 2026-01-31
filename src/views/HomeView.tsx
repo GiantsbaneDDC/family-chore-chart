@@ -150,6 +150,7 @@ export default function HomeView() {
   const [showWelcome, setShowWelcome] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pendingVoiceRef = useRef<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -178,10 +179,11 @@ export default function HomeView() {
         setTranscript(text);
         
         if (result.isFinal) {
+          // Set ref BEFORE state change (state change triggers the auto-submit effect)
+          pendingVoiceRef.current = text;
           setInput(text);
           setIsListening(false);
           setListenStatus('');
-          pendingVoiceRef.current = text;
         }
       };
       
@@ -246,9 +248,6 @@ export default function HomeView() {
     
     window.speechSynthesis.speak(utterance);
   }, [voiceEnabled]);
-
-  // Track if we should auto-send after voice input
-  const pendingVoiceRef = useRef<string | null>(null);
 
   const toggleListening = () => {
     // Check if we're on HTTPS or localhost (required for microphone)
@@ -381,22 +380,38 @@ export default function HomeView() {
 
       setMessages(prev => [...prev, assistantMessage]);
       
+      // If an action was performed, refresh the dashboard data
+      if (data.actionResult?.success) {
+        loadStats();
+      }
+      
       // Play ElevenLabs audio if available
       if (data.audioUrl) {
         setIsSpeaking(true);
         const audio = new Audio(data.audioUrl);
         audioRef.current = audio;
-        audio.onended = () => setIsSpeaking(false);
-        audio.onerror = () => {
+        audio.onended = () => {
+          console.log('Audio playback finished');
+          setIsSpeaking(false);
+        };
+        audio.onerror = (e) => {
+          console.error('Audio load error:', e, audio.error);
           setIsSpeaking(false);
           // Fallback to browser TTS
           speak(replyText);
         };
-        audio.play().catch(() => {
+        audio.oncanplaythrough = () => {
+          console.log('Audio ready to play:', data.audioUrl);
+        };
+        audio.play().then(() => {
+          console.log('Audio playing');
+        }).catch((err) => {
+          console.error('Audio play error:', err);
           setIsSpeaking(false);
           speak(replyText);
         });
       } else {
+        console.log('No audioUrl, using browser TTS');
         // Fallback to browser TTS
         speak(replyText);
       }

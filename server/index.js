@@ -1750,11 +1750,220 @@ app.post('/api/dinner-plan/copy-week', async (req, res) => {
   }
 });
 
-// ================== CHAT API (Family Assistant via Clawdbot) ==================
+// ================== ASSISTANT ACTIONS ==================
 
 const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
+
+// Action handlers for the family assistant
+const assistantActions = {
+  // ---- CHORE ACTIONS ----
+  async add_chore({ title, icon = '📋', points = 1, money_value = null }) {
+    if (!title) return { success: false, error: 'Chore title is required' };
+    const result = await pool.query(
+      'INSERT INTO chores (title, icon, points, money_value) VALUES ($1, $2, $3, $4) RETURNING *',
+      [title, icon, points, money_value]
+    );
+    return { success: true, chore: result.rows[0], message: `Created chore "${title}"` };
+  },
+
+  async list_chores() {
+    const result = await pool.query('SELECT id, title, icon, points FROM chores ORDER BY title');
+    return { success: true, chores: result.rows };
+  },
+
+  async assign_chore({ chore_name, member_name, day }) {
+    if (!chore_name || !member_name || day === undefined) {
+      return { success: false, error: 'Need chore name, member name, and day' };
+    }
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayIndex = typeof day === 'number' ? day : days.indexOf(day.toLowerCase());
+    if (dayIndex < 0 || dayIndex > 6) return { success: false, error: 'Invalid day' };
+    
+    // Find chore
+    const chore = await pool.query('SELECT id, title FROM chores WHERE LOWER(title) LIKE $1', [`%${chore_name.toLowerCase()}%`]);
+    if (chore.rows.length === 0) return { success: false, error: `No chore found matching "${chore_name}"` };
+    
+    // Find member
+    const member = await pool.query('SELECT id, name FROM family_members WHERE LOWER(name) LIKE $1', [`%${member_name.toLowerCase()}%`]);
+    if (member.rows.length === 0) return { success: false, error: `No family member found matching "${member_name}"` };
+    
+    try {
+      await pool.query(
+        'INSERT INTO assignments (chore_id, member_id, day_of_week) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [chore.rows[0].id, member.rows[0].id, dayIndex]
+      );
+      return { success: true, message: `Assigned "${chore.rows[0].title}" to ${member.rows[0].name} on ${days[dayIndex]}` };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  async unassign_chore({ chore_name, member_name, day }) {
+    if (!chore_name || !member_name || day === undefined) {
+      return { success: false, error: 'Need chore name, member name, and day' };
+    }
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayIndex = typeof day === 'number' ? day : days.indexOf(day.toLowerCase());
+    if (dayIndex < 0 || dayIndex > 6) return { success: false, error: 'Invalid day' };
+    
+    const chore = await pool.query('SELECT id, title FROM chores WHERE LOWER(title) LIKE $1', [`%${chore_name.toLowerCase()}%`]);
+    if (chore.rows.length === 0) return { success: false, error: `No chore found matching "${chore_name}"` };
+    
+    const member = await pool.query('SELECT id, name FROM family_members WHERE LOWER(name) LIKE $1', [`%${member_name.toLowerCase()}%`]);
+    if (member.rows.length === 0) return { success: false, error: `No family member found matching "${member_name}"` };
+    
+    await pool.query(
+      'DELETE FROM assignments WHERE chore_id = $1 AND member_id = $2 AND day_of_week = $3',
+      [chore.rows[0].id, member.rows[0].id, dayIndex]
+    );
+    return { success: true, message: `Removed "${chore.rows[0].title}" from ${member.rows[0].name} on ${days[dayIndex]}` };
+  },
+
+  async complete_chore({ chore_name, member_name }) {
+    if (!chore_name || !member_name) {
+      return { success: false, error: 'Need chore name and member name' };
+    }
+    const weekStart = getWeekStart();
+    const todayDow = new Date().getDay();
+    
+    const chore = await pool.query('SELECT id, title, points FROM chores WHERE LOWER(title) LIKE $1', [`%${chore_name.toLowerCase()}%`]);
+    if (chore.rows.length === 0) return { success: false, error: `No chore found matching "${chore_name}"` };
+    
+    const member = await pool.query('SELECT id, name FROM family_members WHERE LOWER(name) LIKE $1', [`%${member_name.toLowerCase()}%`]);
+    if (member.rows.length === 0) return { success: false, error: `No family member found matching "${member_name}"` };
+    
+    // Find assignment for today
+    const assignment = await pool.query(
+      'SELECT id FROM assignments WHERE chore_id = $1 AND member_id = $2 AND day_of_week = $3',
+      [chore.rows[0].id, member.rows[0].id, todayDow]
+    );
+    if (assignment.rows.length === 0) {
+      return { success: false, error: `${member.rows[0].name} doesn't have "${chore.rows[0].title}" assigned today` };
+    }
+    
+    // Complete it
+    await pool.query(
+      'INSERT INTO completions (assignment_id, week_start) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [assignment.rows[0].id, weekStart]
+    );
+    
+    // Award stars
+    await pool.query(
+      'UPDATE family_members SET total_stars = total_stars + $1 WHERE id = $2',
+      [chore.rows[0].points, member.rows[0].id]
+    );
+    
+    return { success: true, message: `${member.rows[0].name} completed "${chore.rows[0].title}" and earned ${chore.rows[0].points} star(s)!` };
+  },
+
+  // ---- RECIPE ACTIONS ----
+  async add_recipe({ title, icon = '🍽️', description = '', prep_time = null, cook_time = null, servings = 4, ingredients = [], instructions = [], tags = [] }) {
+    if (!title) return { success: false, error: 'Recipe title is required' };
+    
+    // Parse time strings like "20 mins" to integers
+    const parseTime = (t) => {
+      if (t === null || t === undefined) return null;
+      if (typeof t === 'number') return t;
+      const match = String(t).match(/(\d+)/);
+      return match ? parseInt(match[1]) : null;
+    };
+    
+    const result = await pool.query(
+      `INSERT INTO recipes (title, icon, description, prep_time, cook_time, servings, ingredients, instructions, tags) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [title, icon, description, parseTime(prep_time), parseTime(cook_time), servings || 4, JSON.stringify(ingredients), JSON.stringify(instructions), JSON.stringify(tags)]
+    );
+    return { success: true, recipe: result.rows[0], message: `Added recipe "${title}"` };
+  },
+
+  async list_recipes() {
+    const result = await pool.query('SELECT id, title, icon, description, tags FROM recipes ORDER BY title');
+    return { success: true, recipes: result.rows };
+  },
+
+  async set_dinner({ recipe_name, day }) {
+    if (!recipe_name || day === undefined) {
+      return { success: false, error: 'Need recipe name and day' };
+    }
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayIndex = typeof day === 'number' ? day : days.indexOf(day.toLowerCase());
+    if (dayIndex < 0 || dayIndex > 6) return { success: false, error: 'Invalid day' };
+    
+    const recipe = await pool.query('SELECT id, title FROM recipes WHERE LOWER(title) LIKE $1', [`%${recipe_name.toLowerCase()}%`]);
+    if (recipe.rows.length === 0) return { success: false, error: `No recipe found matching "${recipe_name}"` };
+    
+    const weekStart = getWeekStart();
+    await pool.query(
+      `INSERT INTO dinner_plans (recipe_id, day_of_week, week_start) VALUES ($1, $2, $3)
+       ON CONFLICT (day_of_week, week_start) DO UPDATE SET recipe_id = $1`,
+      [recipe.rows[0].id, dayIndex, weekStart]
+    );
+    return { success: true, message: `Set ${days[dayIndex]}'s dinner to "${recipe.rows[0].title}"` };
+  },
+
+  async clear_dinner({ day }) {
+    if (day === undefined) return { success: false, error: 'Need day to clear' };
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayIndex = typeof day === 'number' ? day : days.indexOf(day.toLowerCase());
+    if (dayIndex < 0 || dayIndex > 6) return { success: false, error: 'Invalid day' };
+    
+    const weekStart = getWeekStart();
+    await pool.query('DELETE FROM dinner_plans WHERE day_of_week = $1 AND week_start = $2', [dayIndex, weekStart]);
+    return { success: true, message: `Cleared dinner plan for ${days[dayIndex]}` };
+  },
+
+  // ---- FAMILY ACTIONS ----
+  async award_stars({ member_name, stars }) {
+    if (!member_name || !stars) return { success: false, error: 'Need member name and number of stars' };
+    const member = await pool.query('SELECT id, name, total_stars FROM family_members WHERE LOWER(name) LIKE $1', [`%${member_name.toLowerCase()}%`]);
+    if (member.rows.length === 0) return { success: false, error: `No family member found matching "${member_name}"` };
+    
+    await pool.query('UPDATE family_members SET total_stars = total_stars + $1 WHERE id = $2', [stars, member.rows[0].id]);
+    const newTotal = parseInt(member.rows[0].total_stars) + stars;
+    return { success: true, message: `Awarded ${stars} star(s) to ${member.rows[0].name}! They now have ${newTotal} stars.` };
+  },
+
+  async get_member_stats({ member_name }) {
+    if (!member_name) return { success: false, error: 'Need member name' };
+    const member = await pool.query('SELECT * FROM family_members WHERE LOWER(name) LIKE $1', [`%${member_name.toLowerCase()}%`]);
+    if (member.rows.length === 0) return { success: false, error: `No family member found matching "${member_name}"` };
+    
+    const m = member.rows[0];
+    const weekStart = getWeekStart();
+    const choresResult = await pool.query(`
+      SELECT c.title, a.day_of_week, 
+             CASE WHEN comp.id IS NOT NULL THEN true ELSE false END as completed
+      FROM assignments a
+      JOIN chores c ON a.chore_id = c.id
+      LEFT JOIN completions comp ON a.id = comp.assignment_id AND comp.week_start = $2
+      WHERE a.member_id = $1
+      ORDER BY a.day_of_week
+    `, [m.id, weekStart]);
+    
+    return { 
+      success: true, 
+      member: { name: m.name, avatar: m.avatar, stars: m.total_stars, allowance: m.allowance_balance },
+      chores: choresResult.rows
+    };
+  }
+};
+
+// Execute an action from the assistant
+async function executeAction(actionName, params) {
+  if (!assistantActions[actionName]) {
+    return { success: false, error: `Unknown action: ${actionName}` };
+  }
+  try {
+    return await assistantActions[actionName](params);
+  } catch (err) {
+    console.error(`Action ${actionName} failed:`, err);
+    return { success: false, error: err.message };
+  }
+}
+
+// ================== CHAT API (Family Assistant via Clawdbot) ==================
 
 app.post('/api/chat', async (req, res) => {
   try {
@@ -1787,14 +1996,19 @@ app.post('/api/chat', async (req, res) => {
     const totalChores = choreStats.rows.reduce((sum, r) => sum + parseInt(r.total), 0);
     const doneChores = choreStats.rows.reduce((sum, r) => sum + parseInt(r.done), 0);
     
-    // Build context string
+    // Get all chores and recipes for context
+    const [allChores, allRecipes] = await Promise.all([
+      pool.query('SELECT id, title, icon, points FROM chores ORDER BY title'),
+      pool.query('SELECT id, title, icon FROM recipes ORDER BY title')
+    ]);
+
+    // Build context string with action capabilities
     let context = `You are the Family Assistant for this household's Family Hub app (displayed on a tablet).
 Today is ${days[todayDow]}.
 
 YOUR ROLE:
 - Help the family with chores, meal planning, and tracking stars/rewards
-- Answer questions about the household data shown below
-- You can also chat generally, tell jokes, help with homework, etc.
+- You CAN perform actions to manage the app (add chores, recipes, assignments, etc.)
 - Keep responses SHORT and friendly (1-3 sentences usually) - this is spoken aloud
 - Use simple language suitable for kids ages 8-14
 
@@ -1803,6 +2017,8 @@ FAMILY MEMBERS: ${membersResult.rows.map(m => `${m.avatar} ${m.name} (${m.total_
 TODAY'S CHORES (${doneChores}/${totalChores} complete):
 ${choreStats.rows.filter(m => parseInt(m.total) > 0).map(m => `  ${m.avatar} ${m.name}: ${m.done}/${m.total}${parseInt(m.done) === parseInt(m.total) ? ' ✅' : ''}`).join('\n')}
 
+AVAILABLE CHORES: ${allChores.rows.map(c => `${c.icon} ${c.title}`).join(', ')}
+
 DINNER PLAN THIS WEEK:
 ${days.map((day, i) => {
   const plan = dinnerPlan.rows.find(r => r.day_of_week === i);
@@ -1810,13 +2026,36 @@ ${days.map((day, i) => {
   return `  ${isToday ? '👉 ' : ''}${day}: ${plan ? `${plan.icon} ${plan.title}` : 'Not planned'}`;
 }).join('\n')}
 
+AVAILABLE RECIPES: ${allRecipes.rows.map(r => `${r.icon} ${r.title}`).join(', ')}
+
 STAR LEADERBOARD:
 ${leaderboard.rows.map((m, i) => {
   const medals = ['🥇', '🥈', '🥉'];
   return `  ${medals[i] || `${i+1}.`} ${m.avatar} ${m.name}: ${m.total_stars || 0} stars`;
 }).join('\n')}
 
-IMPORTANT: When someone asks to ADD/CHANGE something (like meals or chores), explain that they can do it in the relevant section of the app (Dinner Plan, Chores, etc.) and offer to help with what's currently there.`;
+AVAILABLE ACTIONS:
+To perform an action, include a JSON block in your response like this:
+\`\`\`action
+{"action": "action_name", "params": {...}}
+\`\`\`
+
+Actions you can use:
+- add_chore: Create a new chore. Params: title (required), icon, points (default 1)
+- assign_chore: Assign chore to someone. Params: chore_name, member_name, day (e.g. "monday")
+- unassign_chore: Remove assignment. Params: chore_name, member_name, day
+- complete_chore: Mark done (today only). Params: chore_name, member_name
+- add_recipe: Add new recipe. Params: title (required), icon, description, prep_time, cook_time, ingredients (array), instructions (array)
+- set_dinner: Set meal for a day. Params: recipe_name, day
+- clear_dinner: Remove meal plan. Params: day
+- award_stars: Give bonus stars. Params: member_name, stars (number)
+
+GUIDELINES:
+- Always confirm before making changes (unless it's clearly a direct request)
+- After an action, tell them what you did in a friendly way
+- If an action fails, explain what went wrong simply
+- You can chat normally too - tell jokes, help with homework, etc.
+- Only use actions when the user actually wants to change something`;
     
     // Call Clawdbot gateway
     const response = await fetch('http://127.0.0.1:18789/v1/chat/completions', {
@@ -1841,7 +2080,32 @@ IMPORTANT: When someone asks to ADD/CHANGE something (like meals or chores), exp
     }
     
     const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || "I'm having trouble thinking right now. Try again!";
+    let reply = data.choices?.[0]?.message?.content || "I'm having trouble thinking right now. Try again!";
+    
+    // Parse and execute any actions in the response
+    const actionMatch = reply.match(/```action\s*\n?([\s\S]*?)\n?```/);
+    let actionResult = null;
+    if (actionMatch) {
+      try {
+        const actionData = JSON.parse(actionMatch[1]);
+        console.log('Executing action:', actionData);
+        actionResult = await executeAction(actionData.action, actionData.params || {});
+        console.log('Action result:', actionResult);
+        
+        // Remove the action block from the reply
+        reply = reply.replace(/```action\s*\n?[\s\S]*?\n?```/g, '').trim();
+        
+        // If the action was successful and reply is now empty, use the action message
+        if (actionResult.success && !reply) {
+          reply = actionResult.message || 'Done!';
+        } else if (!actionResult.success) {
+          // Append error info if action failed
+          reply = reply || `Sorry, that didn't work: ${actionResult.error}`;
+        }
+      } catch (parseErr) {
+        console.error('Failed to parse action:', parseErr);
+      }
+    }
     
     // Generate audio if voice is enabled
     let audioUrl = null;
@@ -1856,8 +2120,8 @@ IMPORTANT: When someone asks to ADD/CHANGE something (like meals or chores), exp
           .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
           .trim();
         
-        // Use sag for TTS
-        await execPromise(`sag -o "${audioFile}" "${cleanText.replace(/"/g, '\\"')}"`, {
+        // Use sag for TTS with Charlie voice
+        await execPromise(`sag -o "${audioFile}" -v IKne3meq5aSn9XLyUdCD "${cleanText.replace(/"/g, '\\"')}"`, {
           env: { ...process.env, ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY || '' }
         });
         
@@ -1867,7 +2131,7 @@ IMPORTANT: When someone asks to ADD/CHANGE something (like meals or chores), exp
       }
     }
     
-    res.json({ reply, audioUrl });
+    res.json({ reply, audioUrl, actionResult });
   } catch (err) {
     console.error('Error in chat:', err);
     res.status(500).json({ reply: "Oops! I couldn't connect to my brain. Try again in a moment! 🤔" });
@@ -1890,7 +2154,7 @@ app.get('*', (req, res) => {
 });
 
 // Start server(s)
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 8080;
 const HTTPS_PORT = process.env.HTTPS_PORT || 8443;
 
 // Try to load SSL certificates for HTTPS
