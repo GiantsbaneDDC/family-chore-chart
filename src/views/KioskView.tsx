@@ -251,6 +251,12 @@ export default function KioskView() {
             const dayAssignments = getAssignmentsForMemberDay(member.id, dayIndex);
             const memberExtraTasks = dayIndex === today ? getExtraTasksForMember(member.id) : [];
             const isToday = dayIndex === today;
+            
+            // Combine all items and calculate overflow
+            const allItems = [...dayAssignments, ...memberExtraTasks.map(et => ({ ...et, isExtra: true }))];
+            const maxVisible = Math.max(2, Math.floor(100 / members.length) - 1); // Dynamic based on member count
+            const visibleItems = allItems.slice(0, maxVisible);
+            const hiddenCount = allItems.length - visibleItems.length;
 
             return (
               <Box
@@ -264,8 +270,74 @@ export default function KioskView() {
                   overflow: 'hidden',
                 }}
               >
-                {/* Regular chores */}
-                {dayAssignments.map(assignment => {
+                {/* Visible chores */}
+                {visibleItems.map(item => {
+                  // Check if it's an extra task
+                  if ('isExtra' in item) {
+                    const claim = item as typeof memberExtraTasks[0] & { isExtra: boolean };
+                    const completed = claim.completed_at !== null;
+                    return (
+                      <Tooltip 
+                        key={`extra-${claim.claim_id}`} 
+                        label={`⭐ BONUS: ${claim.title} (${claim.stars} stars)`}
+                        position="top"
+                        withArrow
+                      >
+                        <Box
+                          onClick={() => handleExtraTaskToggle(claim.claim_id)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            padding: '6px 10px',
+                            borderRadius: 8,
+                            background: completed ? '#fef3c7' : '#fff7ed',
+                            border: completed ? '2px solid #f59e0b' : '2px solid #fed7aa',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                            position: 'relative',
+                            opacity: completed ? 0.85 : 1,
+                            width: '100%',
+                          }}
+                        >
+                          <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{claim.icon}</span>
+                          <span 
+                            style={{ 
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              flex: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              textDecoration: completed ? 'line-through' : 'none',
+                            }}
+                          >
+                            {claim.title}
+                          </span>
+                          <IconStar size={14} color="#f59e0b" style={{ flexShrink: 0 }} />
+                          {completed && (
+                            <Box
+                              style={{
+                                width: 18,
+                                height: 18,
+                                background: '#f59e0b',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <IconCheck size={10} color="white" stroke={3} />
+                            </Box>
+                          )}
+                        </Box>
+                      </Tooltip>
+                    );
+                  }
+                  
+                  // Regular chore
+                  const assignment = item as typeof dayAssignments[0];
                   const completed = isCompleted(assignment.id);
                   return (
                     <Tooltip 
@@ -326,68 +398,31 @@ export default function KioskView() {
                   );
                 })}
 
-                {/* Extra tasks (bonus) - only shown on today */}
-                {memberExtraTasks.map(claim => {
-                  const completed = claim.completed_at !== null;
-                  return (
-                    <Tooltip 
-                      key={`extra-${claim.claim_id}`} 
-                      label={`⭐ BONUS: ${claim.title} (${claim.stars} stars)`}
-                      position="top"
-                      withArrow
-                    >
-                      <Box
-                        onClick={() => handleExtraTaskToggle(claim.claim_id)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: '6px 10px',
-                          borderRadius: 8,
-                          background: completed ? '#fef3c7' : '#fff7ed',
-                          border: completed ? '2px solid #f59e0b' : '2px solid #fed7aa',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s',
-                          position: 'relative',
-                          opacity: completed ? 0.85 : 1,
-                          width: '100%',
-                        }}
-                      >
-                        <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{claim.icon}</span>
-                        <span 
-                          style={{ 
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            flex: 1,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            textDecoration: completed ? 'line-through' : 'none',
-                          }}
-                        >
-                          {claim.title}
-                        </span>
-                        <IconStar size={14} color="#f59e0b" style={{ flexShrink: 0 }} />
-                        {completed && (
-                          <Box
-                            style={{
-                              width: 18,
-                              height: 18,
-                              background: '#f59e0b',
-                              borderRadius: '50%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                            }}
-                          >
-                            <IconCheck size={10} color="white" stroke={3} />
-                          </Box>
-                        )}
-                      </Box>
-                    </Tooltip>
-                  );
-                })}
+                {/* Show +X more indicator if there are hidden items */}
+                {hiddenCount > 0 && (
+                  <Box
+                    component={Link}
+                    to={`/my/${member.id}`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      padding: '6px 10px',
+                      borderRadius: 8,
+                      background: `${member.color}20`,
+                      border: `2px dashed ${member.color}`,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                      width: '100%',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <Text size="sm" fw={700} c={member.color}>
+                      +{hiddenCount} more
+                    </Text>
+                  </Box>
+                )}
               </Box>
             );
           })}
