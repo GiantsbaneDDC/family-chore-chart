@@ -180,7 +180,7 @@ export default function KidView() {
         <Box style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <ActionIcon 
             component={Link} 
-            to="/" 
+            to="/chores" 
             variant="white"
             size={40}
             radius="xl"
