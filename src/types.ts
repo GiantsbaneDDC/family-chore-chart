@@ -3,6 +3,14 @@ export interface FamilyMember {
   name: string;
   color: string;
   avatar: string;
+  total_stars?: number;
+  created_at: string;
+}
+
+export interface StarHistory {
+  id: number;
+  stars: number;
+  description: string;
   created_at: string;
 }
 

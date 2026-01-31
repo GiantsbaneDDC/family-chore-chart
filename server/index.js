@@ -63,7 +63,7 @@ app.get('/api/members/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      'SELECT id, name, color, avatar, created_at FROM family_members WHERE id = $1',
+      'SELECT id, name, color, avatar, total_stars, created_at FROM family_members WHERE id = $1',
       [id]
     );
     if (result.rows.length === 0) {
@@ -893,11 +893,13 @@ app.post('/api/extra-tasks/claims/:claimId/toggle', async (req, res) => {
   try {
     const { claimId } = req.params;
     
-    // Get current state
-    const current = await pool.query(
-      'SELECT id, completed_at, member_id, extra_task_id FROM extra_task_claims WHERE id = $1',
-      [claimId]
-    );
+    // Get current state with task details
+    const current = await pool.query(`
+      SELECT etc.id, etc.completed_at, etc.member_id, etc.extra_task_id, et.title, et.stars
+      FROM extra_task_claims etc
+      JOIN extra_tasks et ON etc.extra_task_id = et.id
+      WHERE etc.id = $1
+    `, [claimId]);
     
     if (current.rows.length === 0) {
       return res.status(404).json({ error: 'Claim not found' });
@@ -906,17 +908,64 @@ app.post('/api/extra-tasks/claims/:claimId/toggle', async (req, res) => {
     const claim = current.rows[0];
     
     if (claim.completed_at) {
-      // Uncomplete
+      // Uncomplete - deduct stars
       await pool.query('UPDATE extra_task_claims SET completed_at = NULL WHERE id = $1', [claimId]);
-      res.json({ completed: false });
+      await pool.query('UPDATE family_members SET total_stars = GREATEST(0, total_stars - $1) WHERE id = $2', 
+        [claim.stars, claim.member_id]);
+      await pool.query('INSERT INTO star_history (member_id, stars, description) VALUES ($1, $2, $3)',
+        [claim.member_id, -claim.stars, `Undo: ${claim.title}`]);
+      res.json({ completed: false, starsChanged: -claim.stars });
     } else {
-      // Complete
+      // Complete - award stars
       await pool.query('UPDATE extra_task_claims SET completed_at = NOW() WHERE id = $1', [claimId]);
-      res.json({ completed: true });
+      await pool.query('UPDATE family_members SET total_stars = total_stars + $1 WHERE id = $2', 
+        [claim.stars, claim.member_id]);
+      await pool.query('INSERT INTO star_history (member_id, stars, description) VALUES ($1, $2, $3)',
+        [claim.member_id, claim.stars, claim.title]);
+      res.json({ completed: true, starsEarned: claim.stars });
     }
   } catch (err) {
     console.error('Error toggling extra task completion:', err);
     res.status(500).json({ error: 'Failed to toggle completion' });
+  }
+});
+
+// Get star history for a member
+app.get('/api/stars/:memberId', async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    
+    const [memberResult, historyResult] = await Promise.all([
+      pool.query('SELECT total_stars FROM family_members WHERE id = $1', [memberId]),
+      pool.query('SELECT id, stars, description, created_at FROM star_history WHERE member_id = $1 ORDER BY created_at DESC LIMIT 50', [memberId])
+    ]);
+    
+    if (memberResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
+    res.json({
+      totalStars: memberResult.rows[0].total_stars || 0,
+      history: historyResult.rows
+    });
+  } catch (err) {
+    console.error('Error fetching star history:', err);
+    res.status(500).json({ error: 'Failed to fetch star history' });
+  }
+});
+
+// Get all members with star counts (for admin)
+app.get('/api/stars/leaderboard', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, name, avatar, color, total_stars
+      FROM family_members
+      ORDER BY total_stars DESC, name
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching star leaderboard:', err);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
   }
 });
 
@@ -929,7 +978,7 @@ app.get('/api/kiosk', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     
     const [members, assignments, completions, extraTaskClaims] = await Promise.all([
-      pool.query('SELECT id, name, color, avatar FROM family_members ORDER BY created_at'),
+      pool.query('SELECT id, name, color, avatar, total_stars FROM family_members ORDER BY created_at'),
       pool.query(`
         SELECT 
           a.id, a.chore_id, a.member_id, a.day_of_week,

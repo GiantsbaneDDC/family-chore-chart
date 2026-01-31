@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { FamilyMember, Chore, Assignment, KioskData, StreakData, PointsData, Completion, ExtraTask, ExtraTaskClaim } from './types';
+import type { FamilyMember, Chore, Assignment, KioskData, StreakData, PointsData, Completion, ExtraTask, ExtraTaskClaim, StarHistory } from './types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -61,7 +61,13 @@ export const claimExtraTask = (taskId: number, memberId: number) =>
   api.post<ExtraTaskClaim>(`/extra-tasks/${taskId}/claim`, { member_id: memberId }).then(r => r.data);
 export const getTodaysClaims = () => api.get<ExtraTaskClaim[]>('/extra-tasks/claims/today').then(r => r.data);
 export const toggleExtraTaskCompletion = (claimId: number) => 
-  api.post<{ completed: boolean }>(`/extra-tasks/claims/${claimId}/toggle`).then(r => r.data);
+  api.post<{ completed: boolean; starsEarned?: number; starsChanged?: number }>(`/extra-tasks/claims/${claimId}/toggle`).then(r => r.data);
+
+// Stars
+export const getMemberStars = (memberId: number) => 
+  api.get<{ totalStars: number; history: StarHistory[] }>(`/stars/${memberId}`).then(r => r.data);
+export const getStarLeaderboard = () => 
+  api.get<FamilyMember[]>('/stars/leaderboard').then(r => r.data);
 
 // Stats
 export const getMemberStreak = (memberId: number) => 

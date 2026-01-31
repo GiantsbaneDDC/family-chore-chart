@@ -193,6 +193,17 @@ export default function KidView() {
 
         {/* Stats */}
         <Box style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+          {/* Stars */}
+          {(member.total_stars ?? 0) > 0 && (
+            <Box style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <IconStar size={28} color="#fbbf24" fill="#fbbf24" />
+              <Box>
+                <Text size="lg" fw={900} c="white" style={{ lineHeight: 1 }}>{member.total_stars}</Text>
+                <Text size="xs" c="white" style={{ opacity: 0.8 }}>stars</Text>
+              </Box>
+            </Box>
+          )}
+
           {/* Streak */}
           {streak && streak.streak > 0 && (
             <Box style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
