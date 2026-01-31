@@ -17,8 +17,10 @@ import dayjs from 'dayjs';
 import * as api from '../api';
 import type { KioskData, Assignment, ExtraTaskClaim } from '../types';
 import { DAYS, SHORT_DAYS } from '../types';
+import { playPop, playSuccess } from '../utils/effects';
 
 function fireSmallConfetti() {
+  playPop();
   confetti({
     particleCount: 30,
     spread: 50,
@@ -28,6 +30,7 @@ function fireSmallConfetti() {
 }
 
 function fireBigCelebration() {
+  playSuccess();
   const count = 200;
   const defaults = { origin: { y: 0.7 }, zIndex: 9999 };
 

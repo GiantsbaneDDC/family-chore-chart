@@ -7,6 +7,7 @@ import App from './App';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 import './index.css';
+import './styles/animations.css';
 
 const theme = createTheme({
   primaryColor: 'blue',

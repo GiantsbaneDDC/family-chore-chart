@@ -31,6 +31,7 @@ import {
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import * as api from '../api';
+import { celebrateCompletion, playSuccess } from '../utils/effects';
 
 // TypeScript declarations for Web Speech API
 interface SpeechRecognitionResult {
@@ -390,8 +391,10 @@ export default function HomeView() {
 
       setMessages(prev => [...prev, assistantMessage]);
       
-      // If an action was performed, refresh the dashboard data
+      // If an action was performed, celebrate and refresh
       if (data.actionPerformed) {
+        celebrateCompletion();
+        playSuccess();
         loadStats();
       }
       
