@@ -438,88 +438,169 @@ export default function DinnerPlanView() {
         </Stack>
       </Modal>
 
-      {/* Recipe Detail Modal */}
+      {/* Recipe Detail Modal - Large & Kid-Friendly */}
       <Modal
         opened={recipeModalOpen}
         onClose={() => setRecipeModalOpen(false)}
+        size="100%"
+        fullScreen
+        radius={0}
+        styles={{
+          header: { 
+            background: 'linear-gradient(135deg, #ff922b 0%, #fd7e14 100%)',
+            padding: '20px 24px',
+          },
+          title: { width: '100%' },
+          body: { padding: 0 },
+        }}
         title={
           selectedRecipe && (
-            <Group gap="sm">
-              <Text style={{ fontSize: '1.5rem' }}>{selectedRecipe.icon}</Text>
-              <Text fw={700}>{selectedRecipe.title}</Text>
-            </Group>
-          )
-        }
-        size="lg"
-        radius="lg"
-      >
-        {selectedRecipe && (
-          <ScrollArea h={400}>
-            <Stack gap="md">
-              {/* Description */}
-              {selectedRecipe.description && (
-                <Text c="dimmed">{selectedRecipe.description}</Text>
-              )}
-
-              {/* Info Badges */}
-              <Group gap="sm">
+            <Group gap="md" justify="space-between" w="100%">
+              <Group gap="md">
+                <Text style={{ fontSize: '3rem' }}>{selectedRecipe.icon}</Text>
+                <Box>
+                  <Title order={1} c="white" style={{ fontSize: '2rem' }}>{selectedRecipe.title}</Title>
+                  {selectedRecipe.description && (
+                    <Text c="white" size="lg" style={{ opacity: 0.9 }}>{selectedRecipe.description}</Text>
+                  )}
+                </Box>
+              </Group>
+              <Group gap="md">
                 {selectedRecipe.prep_time && (
-                  <Badge size="lg" variant="light" color="gray" leftSection={<IconClock size={14} />}>
+                  <Badge size="xl" variant="white" color="orange" leftSection={<IconClock size={18} />} style={{ fontSize: '1rem', padding: '12px 16px' }}>
                     {selectedRecipe.prep_time} min prep
                   </Badge>
                 )}
                 {selectedRecipe.cook_time && (
-                  <Badge size="lg" variant="light" color="orange" leftSection={<IconFlame size={14} />}>
+                  <Badge size="xl" variant="white" color="orange" leftSection={<IconFlame size={18} />} style={{ fontSize: '1rem', padding: '12px 16px' }}>
                     {selectedRecipe.cook_time} min cook
                   </Badge>
                 )}
                 {selectedRecipe.servings && (
-                  <Badge size="lg" variant="light" color="blue" leftSection={<IconUsers size={14} />}>
+                  <Badge size="xl" variant="white" color="orange" leftSection={<IconUsers size={18} />} style={{ fontSize: '1rem', padding: '12px 16px' }}>
                     Serves {selectedRecipe.servings}
                   </Badge>
                 )}
               </Group>
+            </Group>
+          )
+        }
+      >
+        {selectedRecipe && (
+          <Box 
+            style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '1fr 1.5fr', 
+              height: 'calc(100vh - 100px)',
+              background: '#f8f9fa',
+            }}
+          >
+            {/* Left Column - Ingredients */}
+            <Box 
+              p="xl" 
+              style={{ 
+                background: '#fff',
+                borderRight: '2px solid #e9ecef',
+                overflow: 'auto',
+              }}
+            >
+              <Group gap="sm" mb="lg">
+                <Text style={{ fontSize: '2.5rem' }}>🥬</Text>
+                <Title order={2} c="dark">Ingredients</Title>
+              </Group>
+              
+              <Stack gap="md">
+                {selectedRecipe.ingredients && selectedRecipe.ingredients.map((ing, i) => (
+                  <Paper 
+                    key={i} 
+                    p="md" 
+                    radius="lg" 
+                    style={{ 
+                      background: '#f8f9fa',
+                      border: '2px solid #e9ecef',
+                    }}
+                  >
+                    <Group gap="md">
+                      <Box 
+                        style={{ 
+                          width: 40, 
+                          height: 40, 
+                          borderRadius: '50%', 
+                          background: '#fd7e14',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontWeight: 700,
+                          fontSize: '1.2rem',
+                        }}
+                      >
+                        {i + 1}
+                      </Box>
+                      <Text size="xl" fw={500} style={{ flex: 1 }}>{ing}</Text>
+                    </Group>
+                  </Paper>
+                ))}
+              </Stack>
 
-              {/* Tags */}
+              {/* Tags at bottom */}
               {selectedRecipe.tags && selectedRecipe.tags.length > 0 && (
-                <Group gap="xs">
-                  {selectedRecipe.tags.map((tag, i) => (
-                    <Badge key={i} size="sm" variant="dot" color="orange">
-                      {tag}
-                    </Badge>
-                  ))}
-                </Group>
-              )}
-
-              <Divider />
-
-              {/* Ingredients */}
-              {selectedRecipe.ingredients && selectedRecipe.ingredients.length > 0 && (
-                <Box>
-                  <Title order={5} mb="xs">🥬 Ingredients</Title>
-                  <List spacing="xs" size="sm">
-                    {selectedRecipe.ingredients.map((ing, i) => (
-                      <List.Item key={i}>{ing}</List.Item>
+                <Box mt="xl" pt="lg" style={{ borderTop: '2px solid #e9ecef' }}>
+                  <Group gap="sm">
+                    {selectedRecipe.tags.map((tag, i) => (
+                      <Badge key={i} size="lg" variant="light" color="orange" style={{ fontSize: '0.9rem' }}>
+                        {tag}
+                      </Badge>
                     ))}
-                  </List>
+                  </Group>
                 </Box>
               )}
+            </Box>
 
-              <Divider />
+            {/* Right Column - Instructions */}
+            <ScrollArea p="xl" style={{ background: '#fff' }}>
+              <Group gap="sm" mb="lg">
+                <Text style={{ fontSize: '2.5rem' }}>👨‍🍳</Text>
+                <Title order={2} c="dark">Instructions</Title>
+              </Group>
 
-              {/* Instructions */}
-              {selectedRecipe.instructions && selectedRecipe.instructions.length > 0 && (
-                <Box>
-                  <Title order={5} mb="xs">👨‍🍳 Instructions</Title>
-                  <List type="ordered" spacing="sm" size="sm">
-                    {selectedRecipe.instructions.map((step, i) => (
-                      <List.Item key={i}>{step}</List.Item>
-                    ))}
-                  </List>
-                </Box>
-              )}
-            </Stack>
-          </ScrollArea>
+              <Stack gap="lg">
+                {selectedRecipe.instructions && selectedRecipe.instructions.map((step, i) => (
+                  <Paper 
+                    key={i} 
+                    p="lg" 
+                    radius="xl" 
+                    shadow="sm"
+                    style={{ 
+                      background: i % 2 === 0 ? '#fff4e6' : '#fff',
+                      border: '2px solid #ffe8cc',
+                    }}
+                  >
+                    <Group gap="lg" align="flex-start">
+                      <Box 
+                        style={{ 
+                          width: 60, 
+                          height: 60, 
+                          borderRadius: '50%', 
+                          background: 'linear-gradient(135deg, #ff922b 0%, #fd7e14 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontWeight: 800,
+                          fontSize: '1.5rem',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {i + 1}
+                      </Box>
+                      <Text size="xl" fw={500} style={{ flex: 1, lineHeight: 1.6 }}>{step}</Text>
+                    </Group>
+                  </Paper>
+                ))}
+              </Stack>
+            </ScrollArea>
+          </Box>
         )}
       </Modal>
     </Box>
