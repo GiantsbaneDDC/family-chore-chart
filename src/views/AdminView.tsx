@@ -83,6 +83,11 @@ export default function AdminView() {
     stars: 1,
   });
 
+  // Search filters
+  const [choreSearch, setChoreSearch] = useState('');
+  const [scheduleSearch, setScheduleSearch] = useState('');
+  const [historySearch, setHistorySearch] = useState('');
+
   const isMobile = useMediaQuery('(max-width: 767px)');
 
   const checkAdminStatus = useCallback(async () => {
@@ -538,17 +543,28 @@ export default function AdminView() {
         <Tabs.Panel value="chores">
           <Group justify="space-between" mb="lg">
             <Text fw={700} size="lg">Chores ({chores.length})</Text>
-            <Button 
-              leftSection={<IconPlus size={18} />}
-              onClick={() => { resetChoreForm(); openChoreModal(); }}
-              radius="xl"
-            >
-              Add Chore
-            </Button>
+            <Group gap="md">
+              <TextInput
+                placeholder="Search chores..."
+                value={choreSearch}
+                onChange={(e) => setChoreSearch(e.target.value)}
+                radius="xl"
+                style={{ width: 200 }}
+              />
+              <Button 
+                leftSection={<IconPlus size={18} />}
+                onClick={() => { resetChoreForm(); openChoreModal(); }}
+                radius="xl"
+              >
+                Add Chore
+              </Button>
+            </Group>
           </Group>
 
           <div className="admin-grid">
-            {chores.map(chore => (
+            {chores
+              .filter(c => c.title.toLowerCase().includes(choreSearch.toLowerCase()))
+              .map(chore => (
               <div key={chore.id} className="admin-card">
                 <Group gap="md">
                   <div
@@ -603,7 +619,16 @@ export default function AdminView() {
 
         {/* ASSIGNMENTS TAB */}
         <Tabs.Panel value="assignments">
-          <Text fw={700} size="lg" mb="lg">Weekly Schedule</Text>
+          <Group justify="space-between" mb="lg">
+            <Text fw={700} size="lg">Weekly Schedule</Text>
+            <TextInput
+              placeholder="Search chores or members..."
+              value={scheduleSearch}
+              onChange={(e) => setScheduleSearch(e.target.value)}
+              radius="xl"
+              style={{ width: 250 }}
+            />
+          </Group>
           
           {members.length === 0 || chores.length === 0 ? (
             <Paper p="xl" ta="center" radius="lg" className="empty-state">
@@ -631,8 +656,12 @@ export default function AdminView() {
                       </tr>
                     </thead>
                     <tbody>
-                      {chores.flatMap(chore => 
-                        members.map((member, mIdx) => (
+                      {chores
+                        .filter(c => c.title.toLowerCase().includes(scheduleSearch.toLowerCase()))
+                        .flatMap(chore => 
+                        members
+                          .filter(m => !scheduleSearch || m.name.toLowerCase().includes(scheduleSearch.toLowerCase()) || chore.title.toLowerCase().includes(scheduleSearch.toLowerCase()))
+                          .map((member, mIdx) => (
                           <tr key={`${chore.id}-${member.id}`}>
                             {mIdx === 0 && (
                               <td rowSpan={members.length} style={{ textAlign: 'left' }}>
@@ -713,7 +742,16 @@ export default function AdminView() {
 
         {/* HISTORY TAB */}
         <Tabs.Panel value="history">
-          <Text fw={700} size="lg" mb="lg">Recent Completions</Text>
+          <Group justify="space-between" mb="lg">
+            <Text fw={700} size="lg">Recent Completions</Text>
+            <TextInput
+              placeholder="Search by name or chore..."
+              value={historySearch}
+              onChange={(e) => setHistorySearch(e.target.value)}
+              radius="xl"
+              style={{ width: 250 }}
+            />
+          </Group>
           
           {history.length === 0 ? (
             <Paper p="xl" ta="center" radius="lg" className="empty-state">
@@ -741,7 +779,12 @@ export default function AdminView() {
                       chore_title: string;
                       chore_icon: string;
                       day_of_week: number;
-                    }>).slice(0, 50).map((h, i) => (
+                    }>)
+                      .filter(h => 
+                        h.member_name.toLowerCase().includes(historySearch.toLowerCase()) ||
+                        h.chore_title.toLowerCase().includes(historySearch.toLowerCase())
+                      )
+                      .slice(0, 50).map((h, i) => (
                       <Table.Tr key={i}>
                         <Table.Td>
                           <Text size="sm" fw={500}>
