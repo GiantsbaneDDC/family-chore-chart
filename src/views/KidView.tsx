@@ -11,11 +11,11 @@ import {
   Tooltip,
   RingProgress,
 } from '@mantine/core';
-import { IconArrowLeft, IconCheck, IconCoin } from '@tabler/icons-react';
+import { IconArrowLeft, IconCheck, IconStar } from '@tabler/icons-react';
 import confetti from 'canvas-confetti';
 import dayjs from 'dayjs';
 import * as api from '../api';
-import type { FamilyMember, Assignment, Completion, StreakData } from '../types';
+import type { FamilyMember, Assignment, Completion, StreakData, ExtraTaskClaim } from '../types';
 import { DAYS, SHORT_DAYS } from '../types';
 
 function fireConfetti() {
@@ -47,29 +47,26 @@ export default function KidView() {
   const [member, setMember] = useState<FamilyMember | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [completions, setCompletions] = useState<Completion[]>([]);
+  const [extraTaskClaims, setExtraTaskClaims] = useState<ExtraTaskClaim[]>([]);
   const [streak, setStreak] = useState<StreakData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [allowanceEnabled, setAllowanceEnabled] = useState(false);
-  const [allowanceBalance, setAllowanceBalance] = useState(0);
-  const [coinPopup, setCoinPopup] = useState<{ amount: number; id: number } | null>(null);
 
   const loadData = useCallback(async () => {
     if (!memberId) return;
     try {
-      const [memberData, assignmentsData, completionsData, streakData, allowanceSettings, allowanceData] = await Promise.all([
+      const [memberData, assignmentsData, completionsData, streakData, claimsData] = await Promise.all([
         api.getMember(parseInt(memberId)),
         api.getMemberAssignments(parseInt(memberId)),
         api.getMemberCompletions(parseInt(memberId)),
         api.getMemberStreak(parseInt(memberId)),
-        api.getAllowanceSettings(),
-        api.getMemberAllowance(parseInt(memberId)),
+        api.getTodaysClaims(),
       ]);
       setMember(memberData);
       setAssignments(assignmentsData);
       setCompletions(completionsData);
       setStreak(streakData);
-      setAllowanceEnabled(allowanceSettings.enabled);
-      setAllowanceBalance(Number(allowanceData.balance) || 0);
+      // Filter claims to only this member
+      setExtraTaskClaims(claimsData.filter(c => c.member_id === parseInt(memberId)));
     } catch (err) {
       console.error('Failed to load data:', err);
       navigate('/my');
@@ -96,13 +93,6 @@ export default function KidView() {
       if (result.completed && !wasCompleted) {
         fireStars();
         
-        if (result.moneyEarned && result.moneyEarned > 0) {
-          const earned = result.moneyEarned;
-          setCoinPopup({ amount: earned, id: assignment.id });
-          setAllowanceBalance(prev => prev + earned);
-          setTimeout(() => setCoinPopup(null), 1500);
-        }
-        
         const dayAssignments = assignments.filter(a => a.day_of_week === assignment.day_of_week);
         const dayCompletions = completions.filter(c => 
           dayAssignments.some(a => a.id === c.assignment_id)
@@ -116,6 +106,23 @@ export default function KidView() {
       loadData();
     } catch (err) {
       console.error('Failed to toggle completion:', err);
+    }
+  };
+
+  const handleExtraTaskToggle = async (claimId: number) => {
+    try {
+      const claim = extraTaskClaims.find(c => c.claim_id === claimId);
+      const wasCompleted = claim?.completed_at !== null;
+      
+      await api.toggleExtraTaskCompletion(claimId);
+      
+      if (!wasCompleted) {
+        fireStars();
+      }
+      
+      loadData();
+    } catch (err) {
+      console.error('Failed to toggle extra task:', err);
     }
   };
 
@@ -140,8 +147,11 @@ export default function KidView() {
     assignments.filter(a => a.day_of_week === i)
   );
 
-  // Find max chores in any day for row count
-  const maxChoresPerDay = Math.max(...assignmentsByDay.map(a => a.length), 1);
+  // Find max chores in any day for row count (include extra tasks for today)
+  const maxChoresPerDay = Math.max(
+    ...assignmentsByDay.map((a, i) => a.length + (i === today ? extraTaskClaims.length : 0)), 
+    1
+  );
 
   return (
     <Box
@@ -155,31 +165,6 @@ export default function KidView() {
         overflow: 'hidden',
       }}
     >
-      {/* Coin popup */}
-      {coinPopup && (
-        <Box
-          style={{
-            position: 'fixed',
-            top: '40%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            zIndex: 9999,
-            animation: 'coinPop 1.5s ease-out forwards',
-            pointerEvents: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            background: 'linear-gradient(135deg, #22c55e, #16a34a)',
-            padding: '16px 24px',
-            borderRadius: 16,
-            boxShadow: '0 8px 32px rgba(34, 197, 94, 0.4)',
-          }}
-        >
-          <span style={{ fontSize: 40 }}>🪙</span>
-          <Text size="xl" fw={900} c="white">+${coinPopup.amount.toFixed(2)}</Text>
-        </Box>
-      )}
-
       {/* Header Row */}
       <Box
         style={{
@@ -219,17 +204,6 @@ export default function KidView() {
             </Box>
           )}
 
-          {/* Balance */}
-          {allowanceEnabled && (
-            <Box style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: '1.8rem' }}>💰</span>
-              <Box>
-                <Text size="lg" fw={900} c="white" style={{ lineHeight: 1 }}>${allowanceBalance.toFixed(2)}</Text>
-                <Text size="xs" c="white" style={{ opacity: 0.8 }}>saved</Text>
-              </Box>
-            </Box>
-          )}
-
           {/* Progress */}
           <RingProgress
             size={55}
@@ -259,7 +233,10 @@ export default function KidView() {
         {DAYS.map((_, dayIndex) => {
           const isToday = dayIndex === today;
           const dayAssignments = assignmentsByDay[dayIndex];
-          const dayCompleted = dayAssignments.filter(a => isCompleted(a.id)).length;
+          const dayExtraTasks = dayIndex === today ? extraTaskClaims : [];
+          const dayCompleted = dayAssignments.filter(a => isCompleted(a.id)).length + 
+            dayExtraTasks.filter(c => c.completed_at !== null).length;
+          const dayTotal = dayAssignments.length + dayExtraTasks.length;
           
           return (
             <Box
@@ -278,9 +255,9 @@ export default function KidView() {
                 {SHORT_DAYS[dayIndex]}
               </Text>
               {isToday && <Badge size="xs" variant="white" color="white" c="blue">TODAY</Badge>}
-              {dayAssignments.length > 0 && (
+              {dayTotal > 0 && (
                 <Text size="xs" fw={600} c={isToday ? 'white' : 'dimmed'}>
-                  {dayCompleted}/{dayAssignments.length}
+                  {dayCompleted}/{dayTotal}
                 </Text>
               )}
             </Box>
@@ -291,10 +268,12 @@ export default function KidView() {
         {Array.from({ length: maxChoresPerDay }).map((_, rowIndex) => (
           DAYS.map((_, dayIndex) => {
             const dayAssignments = assignmentsByDay[dayIndex];
-            const assignment = dayAssignments[rowIndex];
+            const dayExtraTasks = dayIndex === today ? extraTaskClaims : [];
+            const allItems = [...dayAssignments, ...dayExtraTasks.map(et => ({ ...et, isExtraTask: true }))];
+            const item = allItems[rowIndex];
             const isToday = dayIndex === today;
             
-            if (!assignment) {
+            if (!item) {
               return (
                 <Box
                   key={`empty-${dayIndex}-${rowIndex}`}
@@ -303,18 +282,82 @@ export default function KidView() {
               );
             }
             
+            // Check if it's an extra task
+            if ('isExtraTask' in item) {
+              const claim = item as ExtraTaskClaim & { isExtraTask: boolean };
+              const completed = claim.completed_at !== null;
+              
+              return (
+                <Tooltip 
+                  key={`extra-${claim.claim_id}`}
+                  label={<Box><Text fw={600}>⭐ BONUS: {claim.title}</Text><Text size="sm">{claim.stars} stars</Text></Box>}
+                  position="top"
+                >
+                  <Box
+                    onClick={() => handleExtraTaskToggle(claim.claim_id)}
+                    style={{
+                      background: completed ? '#fef3c7' : '#fff7ed',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 4,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                      position: 'relative',
+                      border: completed ? '2px solid #f59e0b' : '2px solid #fed7aa',
+                    }}
+                  >
+                    <Box style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: '1.8rem' }}>{claim.icon}</span>
+                      <IconStar size={16} color="#f59e0b" />
+                    </Box>
+                    <Text 
+                      size="xs" 
+                      fw={600} 
+                      ta="center"
+                      style={{ 
+                        maxWidth: '90%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        textDecoration: completed ? 'line-through' : 'none',
+                        opacity: completed ? 0.7 : 1,
+                      }}
+                    >
+                      {claim.title}
+                    </Text>
+                    {completed && (
+                      <Box
+                        style={{
+                          position: 'absolute',
+                          top: 4,
+                          right: 4,
+                          width: 20,
+                          height: 20,
+                          background: '#f59e0b',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <IconCheck size={12} color="white" stroke={3} />
+                      </Box>
+                    )}
+                  </Box>
+                </Tooltip>
+              );
+            }
+            
+            // Regular assignment
+            const assignment = item as Assignment;
             const completed = isCompleted(assignment.id);
-            const hasMoney = allowanceEnabled && assignment.chore_money_value && assignment.chore_money_value > 0;
             
             return (
               <Tooltip 
                 key={assignment.id}
-                label={
-                  <Box>
-                    <Text fw={600}>{assignment.chore_title}</Text>
-                    {hasMoney && <Text size="sm">💰 ${Number(assignment.chore_money_value).toFixed(2)}</Text>}
-                  </Box>
-                }
+                label={<Box><Text fw={600}>{assignment.chore_title}</Text></Box>}
                 position="top"
               >
                 <Box
@@ -352,12 +395,6 @@ export default function KidView() {
                   >
                     {assignment.chore_title}
                   </Text>
-                  {hasMoney && !completed && (
-                    <Badge size="xs" color="green" variant="light">
-                      <IconCoin size={10} style={{ marginRight: 2 }} />
-                      ${Number(assignment.chore_money_value).toFixed(2)}
-                    </Badge>
-                  )}
                   {completed && (
                     <Box
                       style={{

@@ -3,7 +3,6 @@ export interface FamilyMember {
   name: string;
   color: string;
   avatar: string;
-  allowance_balance?: number;
   created_at: string;
 }
 
@@ -12,7 +11,6 @@ export interface Chore {
   title: string;
   icon: string;
   points: number;
-  money_value?: number | null;
   created_at: string;
 }
 
@@ -25,7 +23,6 @@ export interface Assignment {
   chore_title?: string;
   chore_icon?: string;
   chore_points?: number;
-  chore_money_value?: number | null;
   member_name?: string;
   member_color?: string;
   member_avatar?: string;
@@ -38,13 +35,34 @@ export interface Completion {
   completed_at: string;
 }
 
+// Extra Tasks (Bonus Chores)
+export interface ExtraTask {
+  id: number;
+  title: string;
+  icon: string;
+  stars: number;
+  created_at: string;
+}
+
+export interface ExtraTaskClaim {
+  claim_id: number;
+  extra_task_id: number;
+  member_id: number;
+  title: string;
+  icon: string;
+  stars: number;
+  completed_at: string | null;
+  member_name?: string;
+  member_avatar?: string;
+  member_color?: string;
+}
+
 export interface KioskData {
   members: FamilyMember[];
   assignments: Assignment[];
   completions: number[];
+  extraTaskClaims: ExtraTaskClaim[];
   weekStart: string;
-  allowanceEnabled?: boolean;
-  jarMax?: number;
 }
 
 export interface StreakData {
@@ -142,9 +160,8 @@ export interface RewardsData {
   weekStart: string;
 }
 
-export interface AllowanceHistoryEntry {
-  id: number;
-  amount: number;
-  description: string;
-  created_at: string;
-}
+// Extra task icons
+export const EXTRA_TASK_ICONS = [
+  '⭐', '🌟', '✨', '💫', '🎯', '🏆', '🎖️', '🥇',
+  '🎁', '🎀', '💎', '👑', '🚀', '💪', '🙌', '🎉'
+];

@@ -38,12 +38,12 @@ import {
   IconLock,
   IconCheck,
   IconSettings,
-  IconCoin,
+  IconStar,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import * as api from '../api';
-import type { FamilyMember, Chore, Assignment } from '../types';
-import { DAYS, SHORT_DAYS, MEMBER_COLORS, CHORE_ICONS, AVATAR_EMOJIS } from '../types';
+import type { FamilyMember, Chore, Assignment, ExtraTask } from '../types';
+import { DAYS, SHORT_DAYS, MEMBER_COLORS, CHORE_ICONS, AVATAR_EMOJIS, EXTRA_TASK_ICONS } from '../types';
 
 export default function AdminView() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -58,6 +58,7 @@ export default function AdminView() {
 
   const [memberModalOpened, { open: openMemberModal, close: closeMemberModal }] = useDisclosure();
   const [choreModalOpened, { open: openChoreModal, close: closeChoreModal }] = useDisclosure();
+  const [extraTaskModalOpened, { open: openExtraTaskModal, close: closeExtraTaskModal }] = useDisclosure();
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
   const [editingChore, setEditingChore] = useState<Chore | null>(null);
 
@@ -71,12 +72,16 @@ export default function AdminView() {
     title: '',
     icon: '📋',
     points: 1,
-    money_value: null as number | null,
   });
 
-  // Allowance settings
-  const [allowanceEnabled, setAllowanceEnabled] = useState(false);
-  const [jarMax, setJarMax] = useState(10);
+  // Extra tasks
+  const [extraTasks, setExtraTasks] = useState<ExtraTask[]>([]);
+  const [editingExtraTask, setEditingExtraTask] = useState<ExtraTask | null>(null);
+  const [extraTaskForm, setExtraTaskForm] = useState({
+    title: '',
+    icon: '⭐',
+    stars: 1,
+  });
 
   const isMobile = useMediaQuery('(max-width: 767px)');
 
@@ -100,19 +105,18 @@ export default function AdminView() {
 
   const loadAllData = async () => {
     try {
-      const [membersData, choresData, assignmentsData, historyData, allowanceSettings] = await Promise.all([
+      const [membersData, choresData, assignmentsData, historyData, extraTasksData] = await Promise.all([
         api.getMembers(),
         api.getChores(),
         api.getAssignments(),
         api.getHistory(4),
-        api.getAllowanceSettings(),
+        api.getExtraTasks(),
       ]);
       setMembers(membersData);
       setChores(choresData);
       setAssignments(assignmentsData);
       setHistory(historyData);
-      setAllowanceEnabled(allowanceSettings.enabled);
-      setJarMax(allowanceSettings.jarMax);
+      setExtraTasks(extraTasksData);
     } catch {
       notifications.show({
         title: 'Error',
@@ -199,14 +203,10 @@ export default function AdminView() {
 
   const handleSaveChore = async () => {
     try {
-      const choreData = {
-        ...choreForm,
-        money_value: choreForm.money_value || null,
-      };
       if (editingChore) {
-        await api.updateChore(editingChore.id, choreData);
+        await api.updateChore(editingChore.id, choreForm);
       } else {
-        await api.createChore(choreData);
+        await api.createChore(choreForm);
       }
       loadAllData();
       closeChoreModal();
@@ -221,27 +221,51 @@ export default function AdminView() {
     }
   };
 
-  const handleToggleAllowance = async (enabled: boolean) => {
+  // Extra Tasks handlers
+  const handleSaveExtraTask = async () => {
     try {
-      await api.updateAllowanceSettings({ enabled });
-      setAllowanceEnabled(enabled);
-      notifications.show({
-        title: enabled ? 'Allowance Enabled' : 'Allowance Disabled',
-        message: enabled ? 'Kids can now earn money for chores!' : 'Allowance tracking is off',
-        color: enabled ? 'green' : 'gray',
+      if (editingExtraTask) {
+        await api.updateExtraTask(editingExtraTask.id, extraTaskForm);
+      } else {
+        await api.createExtraTask(extraTaskForm);
+      }
+      loadAllData();
+      closeExtraTaskModal();
+      resetExtraTaskForm();
+      notifications.show({ 
+        title: 'Success', 
+        message: editingExtraTask ? 'Bonus task updated' : 'Bonus task added',
+        color: 'green' 
       });
     } catch {
-      notifications.show({ title: 'Error', message: 'Failed to update allowance settings', color: 'red' });
+      notifications.show({ title: 'Error', message: 'Failed to save bonus task', color: 'red' });
     }
   };
 
-  const handleUpdateJarMax = async (value: number) => {
+  const handleDeleteExtraTask = async (id: number) => {
+    if (!confirm('Delete this bonus task?')) return;
     try {
-      await api.updateAllowanceSettings({ jarMax: value });
-      setJarMax(value);
+      await api.deleteExtraTask(id);
+      loadAllData();
+      notifications.show({ title: 'Deleted', message: 'Bonus task removed', color: 'gray' });
     } catch {
-      notifications.show({ title: 'Error', message: 'Failed to update jar max', color: 'red' });
+      notifications.show({ title: 'Error', message: 'Failed to delete bonus task', color: 'red' });
     }
+  };
+
+  const openEditExtraTask = (task: ExtraTask) => {
+    setEditingExtraTask(task);
+    setExtraTaskForm({ 
+      title: task.title, 
+      icon: task.icon, 
+      stars: task.stars,
+    });
+    openExtraTaskModal();
+  };
+
+  const resetExtraTaskForm = () => {
+    setEditingExtraTask(null);
+    setExtraTaskForm({ title: '', icon: '⭐', stars: 1 });
   };
 
   const handleDeleteChore = async (id: number) => {
@@ -261,14 +285,13 @@ export default function AdminView() {
       title: chore.title, 
       icon: chore.icon, 
       points: chore.points,
-      money_value: chore.money_value || null 
     });
     openChoreModal();
   };
 
   const resetChoreForm = () => {
     setEditingChore(null);
-    setChoreForm({ title: '', icon: '📋', points: 1, money_value: null });
+    setChoreForm({ title: '', icon: '📋', points: 1 });
   };
 
   const hasAssignment = (choreId: number, memberId: number, dayOfWeek: number): number | null => {
@@ -539,11 +562,6 @@ export default function AdminView() {
                       <Badge color="yellow" size="sm" variant="light">
                         ⭐ {chore.points} point{chore.points !== 1 ? 's' : ''}
                       </Badge>
-                      {chore.money_value && (
-                        <Badge color="green" size="sm" variant="light">
-                          💵 ${Number(chore.money_value).toFixed(2)}
-                        </Badge>
-                      )}
                     </Group>
                   </div>
                 </Group>
@@ -754,49 +772,63 @@ export default function AdminView() {
 
         {/* SETTINGS TAB */}
         <Tabs.Panel value="settings">
-          <Text fw={700} size="lg" mb="lg">Settings</Text>
+          <Text fw={700} size="lg" mb="lg">Bonus Tasks</Text>
+          <Text size="sm" c="dimmed" mb="lg">
+            Extra tasks that anyone can claim and complete for bonus stars. Great for one-off jobs!
+          </Text>
           
-          <Stack gap="lg">
-            {/* Allowance Settings */}
-            <Paper p="lg" radius="lg" shadow="sm" withBorder>
-              <Group justify="space-between" mb="md">
-                <Group gap="md">
-                  <ThemeIcon size="xl" radius="xl" color="green" variant="light">
-                    <IconCoin size={24} />
-                  </ThemeIcon>
-                  <div>
-                    <Text fw={700} size="lg">Allowance System</Text>
-                    <Text size="sm" c="dimmed">Let kids earn money for completing chores</Text>
-                  </div>
-                </Group>
-                <Switch
-                  checked={allowanceEnabled}
-                  onChange={(e) => handleToggleAllowance(e.currentTarget.checked)}
-                  size="lg"
-                  color="green"
-                />
-              </Group>
-              
-              {allowanceEnabled && (
-                <Stack gap="md" mt="lg" pt="lg" style={{ borderTop: '1px solid #e9ecef' }}>
-                  <NumberInput
-                    label="Money Jar Maximum"
-                    description="The max amount shown in the visual jar (for fill percentage)"
-                    value={jarMax}
-                    onChange={(val) => handleUpdateJarMax(typeof val === 'number' ? val : 10)}
-                    min={1}
-                    max={100}
-                    prefix="$"
-                    size="md"
-                    radius="md"
-                    style={{ maxWidth: 200 }}
-                  />
-                  <Text size="sm" c="dimmed">
-                    💡 Tip: Set money values on individual chores in the Chores tab
-                  </Text>
-                </Stack>
-              )}
-            </Paper>
+          <Button 
+            leftSection={<IconPlus size={16} />} 
+            onClick={() => { resetExtraTaskForm(); openExtraTaskModal(); }}
+            mb="lg"
+            color="orange"
+          >
+            Add Bonus Task
+          </Button>
+          
+          <Stack gap="md">
+            {extraTasks.length === 0 ? (
+              <Paper p="xl" radius="lg" shadow="sm" withBorder ta="center">
+                <Text size="3rem" mb="md">⭐</Text>
+                <Text c="dimmed">No bonus tasks yet. Add some to let kids earn extra stars!</Text>
+              </Paper>
+            ) : (
+              extraTasks.map(task => (
+                <Paper key={task.id} p="md" radius="lg" shadow="sm" withBorder>
+                  <Group justify="space-between">
+                    <Group gap="md">
+                      <Text size="2rem">{task.icon}</Text>
+                      <div>
+                        <Text fw={700} size="lg">{task.title}</Text>
+                        <Badge color="orange" size="sm" variant="light" leftSection={<IconStar size={12} />}>
+                          {task.stars} {task.stars === 1 ? 'star' : 'stars'}
+                        </Badge>
+                      </div>
+                    </Group>
+                    <Group gap="xs">
+                      <ActionIcon 
+                        variant="light" 
+                        size="lg"
+                        radius="xl"
+                        color="orange"
+                        onClick={() => openEditExtraTask(task)}
+                      >
+                        <IconEdit size={18} />
+                      </ActionIcon>
+                      <ActionIcon 
+                        variant="light" 
+                        color="red" 
+                        size="lg"
+                        radius="xl"
+                        onClick={() => handleDeleteExtraTask(task.id)}
+                      >
+                        <IconTrash size={18} />
+                      </ActionIcon>
+                    </Group>
+                  </Group>
+                </Paper>
+              ))
+            )}
           </Stack>
         </Tabs.Panel>
       </Tabs>
@@ -934,30 +966,75 @@ export default function AdminView() {
             radius="md"
           />
 
-          {allowanceEnabled && (
-            <NumberInput
-              label="Money Value (Optional)"
-              description="Amount earned when this chore is completed"
-              value={choreForm.money_value || ''}
-              onChange={(value) => setChoreForm({ ...choreForm, money_value: typeof value === 'number' ? value : null })}
-              min={0}
-              max={100}
-              step={0.25}
-              decimalScale={2}
-              prefix="$"
-              size="md"
-              radius="md"
-              placeholder="No money value"
-              leftSection={<IconCoin size={18} />}
-            />
-          )}
-
           <Group justify="flex-end" mt="md" gap="sm">
             <Button variant="subtle" onClick={closeChoreModal} radius="xl">
               Cancel
             </Button>
             <Button onClick={handleSaveChore} radius="xl" leftSection={<IconCheck size={18} />}>
               {editingChore ? 'Save Changes' : 'Add Chore'}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* EXTRA TASK MODAL */}
+      <Modal
+        opened={extraTaskModalOpened}
+        onClose={closeExtraTaskModal}
+        title={
+          <Text fw={700} size="lg">
+            {editingExtraTask ? 'Edit Bonus Task' : 'Add Bonus Task'}
+          </Text>
+        }
+        size="md"
+        radius="lg"
+        centered={!isMobile}
+        fullScreen={isMobile}
+      >
+        <Stack gap="md">
+          <TextInput
+            label="Task Name"
+            placeholder="e.g., Wash the car"
+            value={extraTaskForm.title}
+            onChange={(e) => setExtraTaskForm({ ...extraTaskForm, title: e.target.value })}
+            size="md"
+            radius="md"
+          />
+
+          <div>
+            <Text size="sm" fw={600} mb="sm">Icon</Text>
+            <div className="emoji-grid">
+              {EXTRA_TASK_ICONS.map(icon => (
+                <button
+                  key={icon}
+                  type="button"
+                  className={`emoji-btn ${extraTaskForm.icon === icon ? 'selected' : ''}`}
+                  onClick={() => setExtraTaskForm({ ...extraTaskForm, icon })}
+                >
+                  {icon}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <NumberInput
+            label="Stars"
+            description="Number of bonus stars for completing this task"
+            value={extraTaskForm.stars}
+            onChange={(value) => setExtraTaskForm({ ...extraTaskForm, stars: typeof value === 'number' ? value : 1 })}
+            min={1}
+            max={20}
+            size="md"
+            radius="md"
+            leftSection={<IconStar size={18} color="#f59e0b" />}
+          />
+
+          <Group justify="flex-end" mt="md" gap="sm">
+            <Button variant="subtle" onClick={closeExtraTaskModal} radius="xl">
+              Cancel
+            </Button>
+            <Button onClick={handleSaveExtraTask} radius="xl" color="orange" leftSection={<IconCheck size={18} />}>
+              {editingExtraTask ? 'Save Changes' : 'Add Task'}
             </Button>
           </Group>
         </Stack>

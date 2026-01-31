@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { FamilyMember, Chore, Assignment, KioskData, StreakData, PointsData, Completion } from './types';
+import type { FamilyMember, Chore, Assignment, KioskData, StreakData, PointsData, Completion, ExtraTask, ExtraTaskClaim } from './types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -19,9 +19,9 @@ export const verifyMemberPin = (id: number, pin: string) =>
 
 // Chores
 export const getChores = () => api.get<Chore[]>('/chores').then(r => r.data);
-export const createChore = (data: { title: string; icon: string; points: number; money_value?: number | null }) => 
+export const createChore = (data: { title: string; icon: string; points: number }) => 
   api.post<Chore>('/chores', data).then(r => r.data);
-export const updateChore = (id: number, data: { title: string; icon: string; points: number; money_value?: number | null }) => 
+export const updateChore = (id: number, data: { title: string; icon: string; points: number }) => 
   api.put<Chore>(`/chores/${id}`, data).then(r => r.data);
 export const deleteChore = (id: number) => api.delete(`/chores/${id}`);
 
@@ -41,13 +41,27 @@ export const getCompletions = (weekStart?: string) =>
 export const getMemberCompletions = (memberId: number, weekStart?: string) => 
   api.get<Completion[]>(`/completions/member/${memberId}`, { params: { week_start: weekStart } }).then(r => r.data);
 export const toggleCompletion = (assignmentId: number, weekStart?: string) => 
-  api.post<{ completed: boolean; moneyEarned?: number }>('/completions/toggle', { assignment_id: assignmentId, week_start: weekStart }).then(r => r.data);
+  api.post<{ completed: boolean }>('/completions/toggle', { assignment_id: assignmentId, week_start: weekStart }).then(r => r.data);
 export const markComplete = (assignmentId: number, weekStart?: string) => 
   api.post('/completions', { assignment_id: assignmentId, week_start: weekStart });
 
 // Kiosk
 export const getKioskData = (weekStart?: string) => 
   api.get<KioskData>('/kiosk', { params: { week_start: weekStart } }).then(r => r.data);
+
+// Extra Tasks (Bonus Chores)
+export const getExtraTasks = () => api.get<ExtraTask[]>('/extra-tasks').then(r => r.data);
+export const getAvailableExtraTasks = () => api.get<ExtraTask[]>('/extra-tasks/available').then(r => r.data);
+export const createExtraTask = (data: { title: string; icon: string; stars: number }) => 
+  api.post<ExtraTask>('/extra-tasks', data).then(r => r.data);
+export const updateExtraTask = (id: number, data: { title: string; icon: string; stars: number }) => 
+  api.put<ExtraTask>(`/extra-tasks/${id}`, data).then(r => r.data);
+export const deleteExtraTask = (id: number) => api.delete(`/extra-tasks/${id}`);
+export const claimExtraTask = (taskId: number, memberId: number) => 
+  api.post<ExtraTaskClaim>(`/extra-tasks/${taskId}/claim`, { member_id: memberId }).then(r => r.data);
+export const getTodaysClaims = () => api.get<ExtraTaskClaim[]>('/extra-tasks/claims/today').then(r => r.data);
+export const toggleExtraTaskCompletion = (claimId: number) => 
+  api.post<{ completed: boolean }>(`/extra-tasks/claims/${claimId}/toggle`).then(r => r.data);
 
 // Stats
 export const getMemberStreak = (memberId: number) => 
@@ -80,18 +94,3 @@ export const checkAchievements = (memberId: number) =>
 // Rewards
 export const getRewardsData = (weekStart?: string) => 
   api.get<RewardsData>('/rewards', { params: { week_start: weekStart } }).then(r => r.data);
-
-// Allowance Settings
-export const getAllowanceSettings = () => 
-  api.get<{ enabled: boolean; jarMax: number }>('/settings/allowance').then(r => r.data);
-export const updateAllowanceSettings = (data: { enabled?: boolean; jarMax?: number }) => 
-  api.put('/settings/allowance', data).then(r => r.data);
-
-// Allowance
-export const getMemberAllowance = (memberId: number) => 
-  api.get<{ balance: number; history: AllowanceHistoryEntry[] }>(`/allowance/${memberId}`).then(r => r.data);
-export const recordPayout = (memberId: number, amount: number, description?: string) => 
-  api.post<{ success: boolean; newBalance: number }>(`/allowance/${memberId}/payout`, { amount, description }).then(r => r.data);
-
-// Types for allowance
-import type { AllowanceHistoryEntry } from './types';

@@ -11,11 +11,11 @@ import {
   Badge,
   Tooltip,
 } from '@mantine/core';
-import { IconSettings, IconCheck } from '@tabler/icons-react';
+import { IconSettings, IconCheck, IconStar } from '@tabler/icons-react';
 import confetti from 'canvas-confetti';
 import dayjs from 'dayjs';
 import * as api from '../api';
-import type { KioskData, Assignment } from '../types';
+import type { KioskData, Assignment, ExtraTaskClaim } from '../types';
 import { DAYS, SHORT_DAYS } from '../types';
 
 function fireSmallConfetti() {
@@ -76,10 +76,14 @@ export default function KioskView() {
     );
   }
 
-  const { members, assignments, completions } = data;
+  const { members, assignments, completions, extraTaskClaims = [] } = data;
 
   const getAssignmentsForMemberDay = (memberId: number, dayOfWeek: number): Assignment[] => {
     return assignments.filter(a => a.member_id === memberId && a.day_of_week === dayOfWeek);
+  };
+
+  const getExtraTasksForMember = (memberId: number): ExtraTaskClaim[] => {
+    return extraTaskClaims.filter(c => c.member_id === memberId);
   };
 
   const isCompleted = (assignmentId: number): boolean => {
@@ -114,9 +118,34 @@ export default function KioskView() {
     }
   };
 
+  const handleExtraTaskToggle = async (claimId: number) => {
+    try {
+      const claim = extraTaskClaims.find(c => c.claim_id === claimId);
+      const wasCompleted = claim?.completed_at !== null;
+      
+      await api.toggleExtraTaskCompletion(claimId);
+      
+      if (!wasCompleted) {
+        fireSmallConfetti();
+      }
+      
+      loadData();
+    } catch (err) {
+      console.error('Failed to toggle extra task:', err);
+    }
+  };
+
   const getDayStats = (dayIndex: number) => {
     const dayAssignments = assignments.filter(a => a.day_of_week === dayIndex);
     const completed = dayAssignments.filter(a => completions.includes(a.id)).length;
+    // Include extra tasks for today
+    if (dayIndex === today) {
+      const extraCompleted = extraTaskClaims.filter(c => c.completed_at !== null).length;
+      return { 
+        total: dayAssignments.length + extraTaskClaims.length, 
+        completed: completed + extraCompleted 
+      };
+    }
     return { total: dayAssignments.length, completed };
   };
 
@@ -220,6 +249,7 @@ export default function KioskView() {
           {/* Chore Cells for each day */}
           {DAYS.map((_, dayIndex) => {
             const dayAssignments = getAssignmentsForMemberDay(member.id, dayIndex);
+            const memberExtraTasks = dayIndex === today ? getExtraTasksForMember(member.id) : [];
             const isToday = dayIndex === today;
 
             return (
@@ -234,6 +264,7 @@ export default function KioskView() {
                   overflow: 'hidden',
                 }}
               >
+                {/* Regular chores */}
                 {dayAssignments.map(assignment => {
                   const completed = isCompleted(assignment.id);
                   return (
@@ -280,6 +311,69 @@ export default function KioskView() {
                               width: 18,
                               height: 18,
                               background: '#22c55e',
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <IconCheck size={10} color="white" stroke={3} />
+                          </Box>
+                        )}
+                      </Box>
+                    </Tooltip>
+                  );
+                })}
+
+                {/* Extra tasks (bonus) - only shown on today */}
+                {memberExtraTasks.map(claim => {
+                  const completed = claim.completed_at !== null;
+                  return (
+                    <Tooltip 
+                      key={`extra-${claim.claim_id}`} 
+                      label={`⭐ BONUS: ${claim.title} (${claim.stars} stars)`}
+                      position="top"
+                      withArrow
+                    >
+                      <Box
+                        onClick={() => handleExtraTaskToggle(claim.claim_id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '6px 10px',
+                          borderRadius: 8,
+                          background: completed ? '#fef3c7' : '#fff7ed',
+                          border: completed ? '2px solid #f59e0b' : '2px solid #fed7aa',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          position: 'relative',
+                          opacity: completed ? 0.85 : 1,
+                          width: '100%',
+                        }}
+                      >
+                        <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{claim.icon}</span>
+                        <span 
+                          style={{ 
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            flex: 1,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            textDecoration: completed ? 'line-through' : 'none',
+                          }}
+                        >
+                          {claim.title}
+                        </span>
+                        <IconStar size={14} color="#f59e0b" style={{ flexShrink: 0 }} />
+                        {completed && (
+                          <Box
+                            style={{
+                              width: 18,
+                              height: 18,
+                              background: '#f59e0b',
                               borderRadius: '50%',
                               display: 'flex',
                               alignItems: 'center',

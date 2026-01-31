@@ -364,7 +364,7 @@ app.post('/api/completions/toggle', async (req, res) => {
     
     // Get assignment details for analytics
     const assignmentInfo = await pool.query(`
-      SELECT a.member_id, a.chore_id, c.title as chore_title, c.points, c.money_value
+      SELECT a.member_id, a.chore_id, c.title as chore_title, c.points
       FROM assignments a
       JOIN chores c ON a.chore_id = c.id
       WHERE a.id = $1
@@ -372,37 +372,15 @@ app.post('/api/completions/toggle', async (req, res) => {
     
     const assignment = assignmentInfo.rows[0];
     
-    // Check if allowance is enabled
-    const allowanceResult = await pool.query(
-      "SELECT value FROM admin_settings WHERE key = 'allowance_enabled'"
-    );
-    const allowanceEnabled = allowanceResult.rows[0]?.value === 'true';
-    
     // Check if completion exists
     const existing = await pool.query(
       'SELECT id FROM completions WHERE assignment_id = $1 AND week_start = $2',
       [assignment_id, ws]
     );
     
-    let moneyEarned = null;
-    
     if (existing.rows.length > 0) {
       // Delete completion
       await pool.query('DELETE FROM completions WHERE id = $1', [existing.rows[0].id]);
-      
-      // If allowance enabled and chore has money_value, deduct from balance
-      if (allowanceEnabled && assignment && assignment.money_value) {
-        const moneyValue = parseFloat(assignment.money_value);
-        await pool.query(
-          'UPDATE family_members SET allowance_balance = GREATEST(0, allowance_balance - $1) WHERE id = $2',
-          [moneyValue, assignment.member_id]
-        );
-        // Log the deduction in history
-        await pool.query(
-          'INSERT INTO allowance_history (member_id, amount, description) VALUES ($1, $2, $3)',
-          [assignment.member_id, -moneyValue, `Undo: ${assignment.chore_title}`]
-        );
-      }
       
       // Log analytics event for undo
       if (assignment) {
@@ -425,21 +403,6 @@ app.post('/api/completions/toggle', async (req, res) => {
         [assignment_id, ws]
       );
       
-      // If allowance enabled and chore has money_value, add to balance
-      if (allowanceEnabled && assignment && assignment.money_value) {
-        const moneyValue = parseFloat(assignment.money_value);
-        await pool.query(
-          'UPDATE family_members SET allowance_balance = allowance_balance + $1 WHERE id = $2',
-          [moneyValue, assignment.member_id]
-        );
-        // Log the earning in history
-        await pool.query(
-          'INSERT INTO allowance_history (member_id, amount, description) VALUES ($1, $2, $3)',
-          [assignment.member_id, moneyValue, assignment.chore_title]
-        );
-        moneyEarned = moneyValue;
-      }
-      
       // Log analytics event
       if (assignment) {
         const hour = new Date().getHours();
@@ -449,7 +412,6 @@ app.post('/api/completions/toggle', async (req, res) => {
             chore_id: assignment.chore_id,
             chore_title: assignment.chore_title,
             points: assignment.points,
-            money_value: assignment.money_value,
             assignment_id,
             week_start: ws,
             hour_of_day: hour
@@ -462,7 +424,7 @@ app.post('/api/completions/toggle', async (req, res) => {
         );
       }
       
-      res.json({ completed: true, moneyEarned });
+      res.json({ completed: true });
     }
   } catch (err) {
     console.error('Error toggling completion:', err);
@@ -791,19 +753,187 @@ app.post('/api/allowance/:memberId/payout', async (req, res) => {
   }
 });
 
+// ================== EXTRA TASKS API ==================
+
+// Get all extra tasks
+app.get('/api/extra-tasks', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, title, icon, stars, created_at FROM extra_tasks ORDER BY created_at DESC'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching extra tasks:', err);
+    res.status(500).json({ error: 'Failed to fetch extra tasks' });
+  }
+});
+
+// Create extra task
+app.post('/api/extra-tasks', async (req, res) => {
+  try {
+    const { title, icon, stars } = req.body;
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    const result = await pool.query(
+      'INSERT INTO extra_tasks (title, icon, stars) VALUES ($1, $2, $3) RETURNING *',
+      [title, icon || '⭐', stars || 1]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error creating extra task:', err);
+    res.status(500).json({ error: 'Failed to create extra task' });
+  }
+});
+
+// Update extra task
+app.put('/api/extra-tasks/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, icon, stars } = req.body;
+    const result = await pool.query(
+      'UPDATE extra_tasks SET title = $1, icon = $2, stars = $3 WHERE id = $4 RETURNING *',
+      [title, icon, stars, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Extra task not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updating extra task:', err);
+    res.status(500).json({ error: 'Failed to update extra task' });
+  }
+});
+
+// Delete extra task
+app.delete('/api/extra-tasks/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM extra_tasks WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting extra task:', err);
+    res.status(500).json({ error: 'Failed to delete extra task' });
+  }
+});
+
+// Get available extra tasks (not claimed today)
+app.get('/api/extra-tasks/available', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const result = await pool.query(`
+      SELECT et.id, et.title, et.icon, et.stars, et.created_at
+      FROM extra_tasks et
+      WHERE NOT EXISTS (
+        SELECT 1 FROM extra_task_claims etc 
+        WHERE etc.extra_task_id = et.id AND etc.claimed_date = $1
+      )
+      ORDER BY et.stars DESC, et.title
+    `, [today]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching available extra tasks:', err);
+    res.status(500).json({ error: 'Failed to fetch available extra tasks' });
+  }
+});
+
+// Claim an extra task
+app.post('/api/extra-tasks/:id/claim', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { member_id } = req.body;
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Check if already claimed today
+    const existing = await pool.query(
+      'SELECT id FROM extra_task_claims WHERE extra_task_id = $1 AND claimed_date = $2',
+      [id, today]
+    );
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'Task already claimed today' });
+    }
+    
+    // Create claim
+    const result = await pool.query(
+      'INSERT INTO extra_task_claims (extra_task_id, member_id, claimed_date) VALUES ($1, $2, $3) RETURNING *',
+      [id, member_id, today]
+    );
+    
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error claiming extra task:', err);
+    res.status(500).json({ error: 'Failed to claim extra task' });
+  }
+});
+
+// Get claimed extra tasks for today (with member info)
+app.get('/api/extra-tasks/claims/today', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const result = await pool.query(`
+      SELECT 
+        etc.id as claim_id, etc.extra_task_id, etc.member_id, etc.claimed_date, etc.completed_at,
+        et.title, et.icon, et.stars,
+        fm.name as member_name, fm.avatar as member_avatar, fm.color as member_color
+      FROM extra_task_claims etc
+      JOIN extra_tasks et ON etc.extra_task_id = et.id
+      JOIN family_members fm ON etc.member_id = fm.id
+      WHERE etc.claimed_date = $1
+      ORDER BY etc.created_at
+    `, [today]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching today claims:', err);
+    res.status(500).json({ error: 'Failed to fetch claims' });
+  }
+});
+
+// Toggle extra task completion
+app.post('/api/extra-tasks/claims/:claimId/toggle', async (req, res) => {
+  try {
+    const { claimId } = req.params;
+    
+    // Get current state
+    const current = await pool.query(
+      'SELECT id, completed_at, member_id, extra_task_id FROM extra_task_claims WHERE id = $1',
+      [claimId]
+    );
+    
+    if (current.rows.length === 0) {
+      return res.status(404).json({ error: 'Claim not found' });
+    }
+    
+    const claim = current.rows[0];
+    
+    if (claim.completed_at) {
+      // Uncomplete
+      await pool.query('UPDATE extra_task_claims SET completed_at = NULL WHERE id = $1', [claimId]);
+      res.json({ completed: false });
+    } else {
+      // Complete
+      await pool.query('UPDATE extra_task_claims SET completed_at = NOW() WHERE id = $1', [claimId]);
+      res.json({ completed: true });
+    }
+  } catch (err) {
+    console.error('Error toggling extra task completion:', err);
+    res.status(500).json({ error: 'Failed to toggle completion' });
+  }
+});
+
 // ================== KIOSK DATA API ==================
 
 // Get all data needed for kiosk view in one call
 app.get('/api/kiosk', async (req, res) => {
   try {
     const weekStart = req.query.week_start || getWeekStart();
+    const today = new Date().toISOString().split('T')[0];
     
-    const [members, assignments, completions, allowanceSettings] = await Promise.all([
-      pool.query('SELECT id, name, color, avatar, allowance_balance FROM family_members ORDER BY created_at'),
+    const [members, assignments, completions, extraTaskClaims] = await Promise.all([
+      pool.query('SELECT id, name, color, avatar FROM family_members ORDER BY created_at'),
       pool.query(`
         SELECT 
           a.id, a.chore_id, a.member_id, a.day_of_week,
-          c.title as chore_title, c.icon as chore_icon, c.points as chore_points, c.money_value as chore_money_value
+          c.title as chore_title, c.icon as chore_icon, c.points as chore_points
         FROM assignments a
         JOIN chores c ON a.chore_id = c.id
         ORDER BY a.day_of_week
@@ -813,36 +943,22 @@ app.get('/api/kiosk', async (req, res) => {
         FROM completions
         WHERE week_start = $1
       `, [weekStart]),
-      pool.query("SELECT key, value FROM admin_settings WHERE key IN ('allowance_enabled', 'allowance_jar_max')")
+      pool.query(`
+        SELECT 
+          etc.id as claim_id, etc.extra_task_id, etc.member_id, etc.completed_at,
+          et.title, et.icon, et.stars
+        FROM extra_task_claims etc
+        JOIN extra_tasks et ON etc.extra_task_id = et.id
+        WHERE etc.claimed_date = $1
+      `, [today])
     ]);
     
-    const completionSet = new Set(
-      completions.rows.map(c => `${c.assignment_id}`)
-    );
-    
-    // Parse allowance settings
-    const settings = { allowanceEnabled: false, jarMax: 10 };
-    for (const row of allowanceSettings.rows) {
-      if (row.key === 'allowance_enabled') {
-        settings.allowanceEnabled = row.value === 'true';
-      } else if (row.key === 'allowance_jar_max') {
-        settings.jarMax = parseFloat(row.value) || 10;
-      }
-    }
-    
     res.json({
-      members: members.rows.map(m => ({
-        ...m,
-        allowance_balance: parseFloat(m.allowance_balance) || 0
-      })),
-      assignments: assignments.rows.map(a => ({
-        ...a,
-        chore_money_value: a.chore_money_value ? parseFloat(a.chore_money_value) : null
-      })),
-      completions: completionSet.size > 0 ? completions.rows.map(c => c.assignment_id) : [],
-      weekStart,
-      allowanceEnabled: settings.allowanceEnabled,
-      jarMax: settings.jarMax
+      members: members.rows,
+      assignments: assignments.rows,
+      completions: completions.rows.map(c => c.assignment_id),
+      extraTaskClaims: extraTaskClaims.rows,
+      weekStart
     });
   } catch (err) {
     console.error('Error fetching kiosk data:', err);

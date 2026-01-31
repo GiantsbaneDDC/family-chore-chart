@@ -1,9 +1,10 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import KioskView from './views/KioskView';
 import KidView from './views/KidView';
 import AdminView from './views/AdminView';
 import PinEntry from './views/PinEntry';
 import RewardsView from './views/RewardsView';
+import BonusView from './views/BonusView';
 import { KioskLayout } from './components/KioskLayout';
 
 function AppRoutes() {
@@ -15,6 +16,7 @@ function AppRoutes() {
       <Route path="/my" element={<PinEntry />} />
       <Route path="/admin" element={<AdminView />} />
       <Route path="/rewards" element={<RewardsView />} />
+      <Route path="/bonus" element={<BonusView />} />
     </Routes>
   );
 }
