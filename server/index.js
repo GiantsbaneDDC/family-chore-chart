@@ -2619,15 +2619,27 @@ If you need data, use an action first. After action results, give a friendly res
 app.get('/api/calendar', async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 14;
+    const from = req.query.from; // Optional start date (YYYY-MM-DD)
+    
+    let startDate, endDate;
+    if (from) {
+      startDate = new Date(from);
+      endDate = new Date(from);
+      endDate.setDate(endDate.getDate() + days);
+    } else {
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - 1);
+      endDate = new Date();
+      endDate.setDate(endDate.getDate() + days);
+    }
     
     const result = await pool.query(`
       SELECT google_id as id, title, start_time as start, end_time as end, 
              all_day as "allDay", location, description, color_id as color
       FROM calendar_events
-      WHERE start_time >= NOW() - INTERVAL '1 day'
-        AND start_time <= NOW() + INTERVAL '${days} days'
+      WHERE start_time >= $1 AND start_time <= $2
       ORDER BY start_time
-    `);
+    `, [startDate.toISOString(), endDate.toISOString()]);
     
     res.json({ events: result.rows });
   } catch (err) {

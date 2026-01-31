@@ -1186,3 +1186,8 @@ input[type="number"] {
   min-height: 0;
   overflow: hidden;
 }
+
+/* Calendar SegmentedControl fix - active label should be dark */
+.mantine-SegmentedControl-label[data-active] {
+  color: #0891b2 !important;
+}

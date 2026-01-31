@@ -64,7 +64,8 @@ export default function CalendarView() {
     try {
       setLoading(true);
       const days = viewMode === '1week' ? 14 : viewMode === '2weeks' ? 21 : 42;
-      const res = await fetch(`/api/calendar?days=${days}`);
+      const fromDate = viewStart.format('YYYY-MM-DD');
+      const res = await fetch(`/api/calendar?days=${days}&from=${fromDate}`);
       const data = await res.json();
       setEvents(data.events || []);
     } catch (err) {
@@ -72,7 +73,7 @@ export default function CalendarView() {
     } finally {
       setLoading(false);
     }
-  }, [offset, viewMode]);
+  }, [offset, viewMode, viewStart]);
 
   useEffect(() => {
     loadEvents();
@@ -171,9 +172,14 @@ export default function CalendarView() {
                 { label: '2 Weeks', value: '2weeks' },
                 { label: 'Month', value: 'month' },
               ]}
+              color="cyan"
               styles={{
-                root: { background: 'rgba(255,255,255,0.2)' },
-                label: { color: 'white', fontWeight: 500 },
+                root: { background: 'rgba(255,255,255,0.2)', border: 'none' },
+                label: { 
+                  fontWeight: 600,
+                  color: 'white',
+                  '&[dataActive]': { color: '#0891b2' },
+                },
                 indicator: { background: 'white' },
               }}
             />
