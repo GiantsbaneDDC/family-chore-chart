@@ -13,13 +13,14 @@ import {
   Button,
   Group,
   Stack,
-  Select,
   Textarea,
   Tooltip,
   TextInput,
   Tabs,
   ScrollArea,
-  Divider,
+  SimpleGrid,
+  Drawer,
+  CloseButton,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { 
@@ -36,6 +37,8 @@ import {
   IconExternalLink,
   IconDownload,
   IconCheck,
+  IconWorld,
+  IconNote,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import * as api from '../api';
@@ -65,12 +68,15 @@ export default function DinnerPlanView() {
   const [loading, setLoading] = useState(true);
   const [weekStart, setWeekStart] = useState(getWeekStart());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [assignRecipeId, setAssignRecipeId] = useState<string | null>(null);
+  
+  // POS-style picker modal
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
   const [assignNotes, setAssignNotes] = useState('');
+  const [notesModalOpen, setNotesModalOpen] = useState(false);
+  const [pendingRecipeId, setPendingRecipeId] = useState<number | null>(null);
   
   // Recipe search/import state
-  const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Array<{title: string; url: string; description: string; source: string}>>([]);
   const [searching, setSearching] = useState(false);
@@ -78,6 +84,10 @@ export default function DinnerPlanView() {
   const [importing, setImporting] = useState(false);
   const [previewRecipe, setPreviewRecipe] = useState<any>(null);
   const [existingUrls, setExistingUrls] = useState<Set<string>>(new Set());
+  
+  // Source viewer
+  const [sourceUrl, setSourceUrl] = useState<string | null>(null);
+  const [sourceTitle, setSourceTitle] = useState<string>('');
 
   const loadData = useCallback(async () => {
     try {
@@ -121,58 +131,80 @@ export default function DinnerPlanView() {
   const handleDayClick = (dayIndex: number) => {
     const plan = getPlanForDay(dayIndex);
     if (plan) {
-      // Navigate to recipe page
       navigate(`/recipe/${plan.recipe_id}`);
     } else {
-      setSelectedDay(dayIndex);
-      setAssignRecipeId(null);
-      setAssignNotes('');
-      setAssignModalOpen(true);
+      openPicker(dayIndex);
     }
   };
 
-  const handleAssignRecipe = async () => {
-    if (selectedDay === null || !assignRecipeId) return;
+  const openPicker = (dayIndex: number) => {
+    setSelectedDay(dayIndex);
+    setPickerSearch('');
+    setAssignNotes('');
+    setSearchQuery('');
+    setSearchResults([]);
+    setPreviewRecipe(null);
+    setPickerOpen(true);
+    fetchExistingUrls();
+  };
+
+  const handleSelectRecipe = async (recipeId: number) => {
+    if (selectedDay === null) return;
     
     try {
       await api.setDinnerPlan({
-        recipe_id: parseInt(assignRecipeId),
+        recipe_id: recipeId,
         day_of_week: selectedDay,
         week_start: weekStart,
         notes: assignNotes || undefined
       });
-      setAssignModalOpen(false);
+      setPickerOpen(false);
       loadData();
+      notifications.show({ 
+        title: 'Done!', 
+        message: `Recipe assigned to ${DAYS[selectedDay]}`,
+        color: 'green' 
+      });
     } catch (err) {
       console.error('Failed to assign recipe:', err);
+      notifications.show({ title: 'Error', message: 'Failed to assign recipe', color: 'red' });
     }
+  };
+
+  const handleSelectWithNotes = (recipeId: number) => {
+    setPendingRecipeId(recipeId);
+    setNotesModalOpen(true);
+  };
+
+  const handleConfirmWithNotes = async () => {
+    if (pendingRecipeId) {
+      await handleSelectRecipe(pendingRecipeId);
+    }
+    setNotesModalOpen(false);
+    setPendingRecipeId(null);
   };
 
   // Fetch existing recipe source URLs for duplicate detection
   const fetchExistingUrls = async () => {
     try {
       const res = await fetch('/api/recipes/source-urls');
-      const data = await res.json();
-      setExistingUrls(new Set(data.urls || []));
+      const urlData = await res.json();
+      setExistingUrls(new Set(urlData.urls || []));
     } catch (err) {
       console.error('Failed to fetch existing URLs:', err);
     }
   };
 
-  // Check if URL already exists (normalize for comparison)
   const isUrlExisting = (url: string) => {
-    // Normalize URL for comparison (remove trailing slashes, protocol variations)
     const normalize = (u: string) => u.replace(/^https?:\/\//, '').replace(/\/+$/, '').toLowerCase();
     const normalized = normalize(url);
     return Array.from(existingUrls).some(existing => normalize(existing) === normalized);
   };
 
-  // Recipe search
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setSearching(true);
     setSearchResults([]);
-    // Fetch existing URLs before showing results
     await fetchExistingUrls();
     try {
       const res = await fetch('/api/recipes/search', {
@@ -180,8 +212,8 @@ export default function DinnerPlanView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: searchQuery }),
       });
-      const data = await res.json();
-      setSearchResults(data.results || []);
+      const searchData = await res.json();
+      setSearchResults(searchData.results || []);
     } catch (err) {
       console.error('Search failed:', err);
       notifications.show({ title: 'Error', message: 'Search failed', color: 'red' });
@@ -190,7 +222,6 @@ export default function DinnerPlanView() {
     }
   };
 
-  // Import recipe from URL
   const handleImport = async (url: string) => {
     setImporting(true);
     setPreviewRecipe(null);
@@ -200,9 +231,9 @@ export default function DinnerPlanView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setPreviewRecipe(data.recipe);
+      const importData = await res.json();
+      if (importData.error) throw new Error(importData.error);
+      setPreviewRecipe(importData.recipe);
     } catch (err: any) {
       console.error('Import failed:', err);
       notifications.show({ title: 'Import Failed', message: err.message || 'Could not import recipe', color: 'red' });
@@ -211,11 +242,10 @@ export default function DinnerPlanView() {
     }
   };
 
-  // Save imported recipe
   const handleSaveRecipe = async () => {
     if (!previewRecipe) return;
     try {
-      await api.createRecipe({
+      const newRecipe = await api.createRecipe({
         title: previewRecipe.title,
         icon: previewRecipe.icon || '🍽️',
         description: previewRecipe.description,
@@ -229,11 +259,14 @@ export default function DinnerPlanView() {
       });
       notifications.show({ title: 'Saved!', message: `${previewRecipe.title} added to recipes`, color: 'green' });
       setPreviewRecipe(null);
-      setSearchModalOpen(false);
       setSearchQuery('');
       setSearchResults([]);
       setImportUrl('');
       loadData();
+      // Auto-select the new recipe
+      if (newRecipe?.id) {
+        handleSelectRecipe(newRecipe.id);
+      }
     } catch (err) {
       console.error('Save failed:', err);
       notifications.show({ title: 'Error', message: 'Failed to save recipe', color: 'red' });
@@ -252,8 +285,13 @@ export default function DinnerPlanView() {
 
   const handleCopyLastWeek = async () => {
     try {
-      await api.copyLastWeekPlan();
+      const result = await api.copyLastWeekPlan();
       loadData();
+      notifications.show({ 
+        title: 'Copied!', 
+        message: `${result.copied} meals copied from last week`,
+        color: 'green' 
+      });
     } catch (err) {
       console.error('Failed to copy last week:', err);
     }
@@ -261,12 +299,19 @@ export default function DinnerPlanView() {
 
   const handleEditDay = (dayIndex: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    const plan = getPlanForDay(dayIndex);
-    setSelectedDay(dayIndex);
-    setAssignRecipeId(plan?.recipe_id?.toString() || null);
-    setAssignNotes(plan?.notes || '');
-    setAssignModalOpen(true);
+    openPicker(dayIndex);
   };
+
+  const openSourceViewer = (url: string, title: string) => {
+    setSourceUrl(url);
+    setSourceTitle(title);
+  };
+
+  // Filter recipes for picker
+  const filteredRecipes = data?.recipes.filter(r => 
+    r.title.toLowerCase().includes(pickerSearch.toLowerCase()) ||
+    r.tags?.some(t => t.toLowerCase().includes(pickerSearch.toLowerCase()))
+  ) || [];
 
   if (loading || !data) {
     return (
@@ -295,12 +340,7 @@ export default function DinnerPlanView() {
       >
         <Group justify="space-between" align="center">
           <Group gap="md">
-            <ActionIcon 
-              variant="white" 
-              size="lg" 
-              radius="xl"
-              onClick={handlePrevWeek}
-            >
+            <ActionIcon variant="white" size="lg" radius="xl" onClick={handlePrevWeek}>
               <IconChevronLeft size={20} />
             </ActionIcon>
             <Box>
@@ -312,50 +352,25 @@ export default function DinnerPlanView() {
                 {formatWeekRange(weekStart)}
               </Text>
             </Box>
-            <ActionIcon 
-              variant="white" 
-              size="lg" 
-              radius="xl"
-              onClick={handleNextWeek}
-            >
+            <ActionIcon variant="white" size="lg" radius="xl" onClick={handleNextWeek}>
               <IconChevronRight size={20} />
             </ActionIcon>
           </Group>
 
           <Group gap="sm">
             {isCurrentWeek && (
-              <Badge size="lg" variant="white" color="orange">
-                This Week
-              </Badge>
+              <Badge size="lg" variant="white" color="orange">This Week</Badge>
             )}
             <Badge size="lg" variant="white" color="orange" leftSection="🍽️">
               {plannedDays}/{totalDays} Planned
             </Badge>
             {plannedDays < totalDays && (
               <Tooltip label="Copy last week's plan">
-                <ActionIcon 
-                  variant="white" 
-                  size="lg" 
-                  radius="xl"
-                  onClick={handleCopyLastWeek}
-                >
+                <ActionIcon variant="white" size="lg" radius="xl" onClick={handleCopyLastWeek}>
                   <IconCopy size={20} />
                 </ActionIcon>
               </Tooltip>
             )}
-            <Tooltip label="Find new recipe">
-              <ActionIcon 
-                variant="white" 
-                size="lg" 
-                radius="xl"
-                onClick={() => {
-                  setSearchModalOpen(true);
-                  fetchExistingUrls();
-                }}
-              >
-                <IconSearch size={20} />
-              </ActionIcon>
-            </Tooltip>
           </Group>
         </Group>
       </Paper>
@@ -386,99 +401,74 @@ export default function DinnerPlanView() {
                 cursor: 'pointer',
                 background: isToday 
                   ? 'linear-gradient(180deg, #fff4e6 0%, #ffe8cc 100%)'
-                  : plan 
-                    ? '#ffffff'
-                    : '#f8f9fa',
+                  : plan ? '#ffffff' : '#f8f9fa',
                 border: isToday 
                   ? '3px solid #fd7e14'
-                  : plan
-                    ? '2px solid #ffe8cc'
-                    : '2px dashed #dee2e6',
+                  : plan ? '2px solid #ffe8cc' : '2px dashed #dee2e6',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
                 transition: 'all 0.2s',
-                position: 'relative',
               }}
             >
-              {/* Day Header */}
               <Group justify="space-between" mb="sm">
                 <Box>
                   <Text size="xs" fw={700} c={isToday ? 'orange' : 'dimmed'} tt="uppercase">
                     {SHORT_DAYS[dayIndex]}
                   </Text>
-                  <Text size="lg" fw={800} c={isToday ? 'orange.7' : 'dark'}>
-                    {day}
-                  </Text>
+                  <Text size="lg" fw={800} c={isToday ? 'orange.7' : 'dark'}>{day}</Text>
                 </Box>
-                {isToday && (
-                  <Badge size="sm" color="orange" variant="filled">
-                    TODAY
-                  </Badge>
-                )}
+                {isToday && <Badge size="sm" color="orange" variant="filled">TODAY</Badge>}
               </Group>
 
-              {/* Meal Content */}
               {plan && recipe ? (
                 <Box style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  {/* Recipe Icon */}
                   <Center mb="sm">
                     <Text style={{ fontSize: '3rem' }}>{recipe.icon}</Text>
                   </Center>
-                  
-                  {/* Recipe Title */}
-                  <Text 
-                    size="md" 
-                    fw={700} 
-                    ta="center"
-                    lineClamp={2}
-                    style={{ flex: 1 }}
-                  >
+                  <Text size="md" fw={700} ta="center" lineClamp={2} style={{ flex: 1 }}>
                     {recipe.title}
                   </Text>
-
-                  {/* Time Info */}
                   {(recipe.prep_time || recipe.cook_time) && (
                     <Group gap="xs" justify="center" mt="xs">
                       {recipe.prep_time && (
                         <Badge size="xs" variant="light" color="gray" leftSection={<IconClock size={10} />}>
-                          {recipe.prep_time}m prep
+                          {recipe.prep_time}m
                         </Badge>
                       )}
                       {recipe.cook_time && (
                         <Badge size="xs" variant="light" color="orange" leftSection={<IconFlame size={10} />}>
-                          {recipe.cook_time}m cook
+                          {recipe.cook_time}m
                         </Badge>
                       )}
                     </Group>
                   )}
-
-                  {/* Notes */}
                   {plan.notes && (
-                    <Text size="xs" c="dimmed" ta="center" mt="xs" lineClamp={1}>
-                      📝 {plan.notes}
-                    </Text>
+                    <Text size="xs" c="dimmed" ta="center" mt="xs" lineClamp={1}>📝 {plan.notes}</Text>
                   )}
-
-                  {/* Action Buttons */}
                   <Group gap="xs" justify="center" mt="sm">
+                    {recipe.source_url && (
+                      <Tooltip label="View original">
+                        <ActionIcon 
+                          size="sm" 
+                          variant="light" 
+                          color="gray"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openSourceViewer(recipe.source_url!, recipe.title);
+                          }}
+                        >
+                          <IconWorld size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
                     <Tooltip label="Change meal">
-                      <ActionIcon 
-                        size="sm" 
-                        variant="light" 
-                        color="blue"
-                        onClick={(e) => handleEditDay(dayIndex, e)}
-                      >
+                      <ActionIcon size="sm" variant="light" color="blue" onClick={(e) => handleEditDay(dayIndex, e)}>
                         <IconPlus size={14} />
                       </ActionIcon>
                     </Tooltip>
                     <Tooltip label="Clear">
-                      <ActionIcon 
-                        size="sm" 
-                        variant="light" 
-                        color="red"
-                        onClick={(e) => handleClearDay(dayIndex, e)}
-                      >
+                      <ActionIcon size="sm" variant="light" color="red" onClick={(e) => handleClearDay(dayIndex, e)}>
                         <IconX size={14} />
                       </ActionIcon>
                     </Tooltip>
@@ -486,17 +476,10 @@ export default function DinnerPlanView() {
                 </Box>
               ) : (
                 <Center style={{ flex: 1, flexDirection: 'column', gap: 8 }}>
-                  <ActionIcon 
-                    size={60} 
-                    variant="light" 
-                    color="gray" 
-                    radius="xl"
-                  >
+                  <ActionIcon size={60} variant="light" color="gray" radius="xl">
                     <IconPlus size={30} />
                   </ActionIcon>
-                  <Text size="sm" c="dimmed" fw={500}>
-                    Add meal
-                  </Text>
+                  <Text size="sm" c="dimmed" fw={500}>Add meal</Text>
                 </Center>
               )}
             </Paper>
@@ -504,296 +487,437 @@ export default function DinnerPlanView() {
         })}
       </Box>
 
-      {/* Assign Recipe Modal */}
+      {/* POS-Style Recipe Picker Modal */}
       <Modal
-        opened={assignModalOpen}
-        onClose={() => setAssignModalOpen(false)}
-        title={
-          <Group gap="sm">
-            <Text style={{ fontSize: '1.5rem' }}>🍽️</Text>
-            <Text fw={700}>
-              {selectedDay !== null ? `${DAYS[selectedDay]}'s Dinner` : 'Assign Recipe'}
-            </Text>
-          </Group>
-        }
-        size="md"
+        opened={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        fullScreen
+        withCloseButton={false}
+        padding={0}
+        styles={{ body: { height: '100%', display: 'flex', flexDirection: 'column' } }}
+      >
+        <Box style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#f8f9fa' }}>
+          {/* Header */}
+          <Paper 
+            p="md" 
+            radius={0}
+            style={{ background: 'linear-gradient(135deg, #ff922b 0%, #fd7e14 100%)', flexShrink: 0 }}
+          >
+            <Group justify="space-between">
+              <Group gap="md">
+                <Text style={{ fontSize: '2rem' }}>🍽️</Text>
+                <Box>
+                  <Title order={3} c="white">
+                    {selectedDay !== null ? `${DAYS[selectedDay]}'s Dinner` : 'Choose Recipe'}
+                  </Title>
+                  <Text size="sm" c="white" style={{ opacity: 0.9 }}>
+                    Tap a recipe to select it
+                  </Text>
+                </Box>
+              </Group>
+              <CloseButton 
+                size="xl" 
+                variant="white" 
+                onClick={() => setPickerOpen(false)}
+                style={{ color: 'white' }}
+              />
+            </Group>
+          </Paper>
+
+          {/* Content */}
+          <Box style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            {/* Left Panel - Your Recipes */}
+            <Box style={{ flex: 2, display: 'flex', flexDirection: 'column', borderRight: '1px solid #e9ecef' }}>
+              <Paper p="md" radius={0} style={{ background: 'white', flexShrink: 0 }}>
+                <Group gap="md">
+                  <TextInput
+                    placeholder="Search your recipes..."
+                    value={pickerSearch}
+                    onChange={(e) => setPickerSearch(e.target.value)}
+                    leftSection={<IconSearch size={18} />}
+                    style={{ flex: 1 }}
+                    size="lg"
+                    radius="xl"
+                  />
+                  <Badge size="xl" variant="light" color="orange" radius="md">
+                    {filteredRecipes.length} recipes
+                  </Badge>
+                </Group>
+              </Paper>
+
+              <ScrollArea style={{ flex: 1 }} p="md">
+                {filteredRecipes.length > 0 ? (
+                  <SimpleGrid cols={4} spacing="md">
+                    {filteredRecipes.map(recipe => (
+                      <Paper
+                        key={recipe.id}
+                        p="lg"
+                        radius="lg"
+                        shadow="sm"
+                        style={{ 
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          border: '2px solid transparent',
+                          background: 'white',
+                        }}
+                        onClick={() => handleSelectRecipe(recipe.id)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          handleSelectWithNotes(recipe.id);
+                        }}
+                        className="recipe-card-hover"
+                      >
+                        <Center mb="sm">
+                          <Text style={{ fontSize: '3rem' }}>{recipe.icon}</Text>
+                        </Center>
+                        <Text fw={700} ta="center" lineClamp={2} mb="xs">
+                          {recipe.title}
+                        </Text>
+                        <Group gap={4} justify="center">
+                          {recipe.prep_time && (
+                            <Badge size="xs" variant="light" color="gray">
+                              {recipe.prep_time}m prep
+                            </Badge>
+                          )}
+                          {recipe.cook_time && (
+                            <Badge size="xs" variant="light" color="orange">
+                              {recipe.cook_time}m cook
+                            </Badge>
+                          )}
+                        </Group>
+                        {recipe.source_url && (
+                          <Center mt="xs">
+                            <ActionIcon 
+                              size="sm" 
+                              variant="subtle" 
+                              color="gray"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openSourceViewer(recipe.source_url!, recipe.title);
+                              }}
+                            >
+                              <IconExternalLink size={14} />
+                            </ActionIcon>
+                          </Center>
+                        )}
+                      </Paper>
+                    ))}
+                  </SimpleGrid>
+                ) : (
+                  <Center py="xl">
+                    <Stack align="center" gap="md">
+                      <Text style={{ fontSize: '4rem' }}>🍳</Text>
+                      <Text fw={600} size="lg" c="dimmed">No recipes found</Text>
+                      <Text c="dimmed">Try searching the web on the right →</Text>
+                    </Stack>
+                  </Center>
+                )}
+              </ScrollArea>
+
+              {/* Quick Notes Button */}
+              <Paper p="sm" radius={0} style={{ background: '#fff7ed', borderTop: '1px solid #fed7aa', flexShrink: 0 }}>
+                <Group gap="sm" justify="center">
+                  <IconNote size={18} color="#f97316" />
+                  <Text size="sm" c="orange.7">
+                    Right-click a recipe to add notes before selecting
+                  </Text>
+                </Group>
+              </Paper>
+            </Box>
+
+            {/* Right Panel - Search & Import */}
+            <Box style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'white' }}>
+              <Paper p="md" radius={0} style={{ background: '#f8f9fa', flexShrink: 0 }}>
+                <Text fw={700} size="lg" mb="xs">🔍 Find New Recipes</Text>
+                <Text size="sm" c="dimmed">Search the web or paste a URL</Text>
+              </Paper>
+
+              <Box style={{ flex: 1, overflow: 'auto' }} p="md">
+                {previewRecipe ? (
+                  // Recipe Preview
+                  <Stack gap="md">
+                    <Paper p="md" radius="lg" style={{ background: '#fff7ed', border: '2px solid #fed7aa' }}>
+                      <Group gap="md" mb="sm">
+                        <Text style={{ fontSize: '2.5rem' }}>{previewRecipe.icon}</Text>
+                        <Box style={{ flex: 1 }}>
+                          <Text fw={700} size="lg">{previewRecipe.title}</Text>
+                          {previewRecipe.description && (
+                            <Text c="dimmed" size="sm" lineClamp={2}>{previewRecipe.description}</Text>
+                          )}
+                        </Box>
+                      </Group>
+                      <Group gap="xs">
+                        {previewRecipe.prep_time && (
+                          <Badge leftSection={<IconClock size={12} />} color="orange" variant="light">
+                            {previewRecipe.prep_time}m prep
+                          </Badge>
+                        )}
+                        {previewRecipe.cook_time && (
+                          <Badge leftSection={<IconFlame size={12} />} color="orange" variant="light">
+                            {previewRecipe.cook_time}m cook
+                          </Badge>
+                        )}
+                        {previewRecipe.servings && (
+                          <Badge color="orange" variant="light">Serves {previewRecipe.servings}</Badge>
+                        )}
+                      </Group>
+                    </Paper>
+
+                    <Box>
+                      <Text fw={600} size="sm" mb="xs">
+                        Ingredients ({previewRecipe.ingredients?.length || 0})
+                      </Text>
+                      <Paper p="sm" radius="md" style={{ background: '#f8f9fa', maxHeight: 120, overflow: 'auto' }}>
+                        {previewRecipe.ingredients?.slice(0, 8).map((ing: string, i: number) => (
+                          <Text key={i} size="xs">• {ing}</Text>
+                        ))}
+                        {previewRecipe.ingredients?.length > 8 && (
+                          <Text size="xs" c="dimmed">...and {previewRecipe.ingredients.length - 8} more</Text>
+                        )}
+                      </Paper>
+                    </Box>
+
+                    <Box>
+                      <Text fw={600} size="sm" mb="xs">
+                        Instructions ({previewRecipe.instructions?.length || 0} steps)
+                      </Text>
+                      <Paper p="sm" radius="md" style={{ background: '#f8f9fa', maxHeight: 120, overflow: 'auto' }}>
+                        {previewRecipe.instructions?.slice(0, 4).map((step: string, i: number) => (
+                          <Text key={i} size="xs" mb={4}>{i + 1}. {step}</Text>
+                        ))}
+                        {previewRecipe.instructions?.length > 4 && (
+                          <Text size="xs" c="dimmed">...and {previewRecipe.instructions.length - 4} more steps</Text>
+                        )}
+                      </Paper>
+                    </Box>
+
+                    {previewRecipe.source_url && (
+                      <Button 
+                        variant="light" 
+                        color="gray"
+                        leftSection={<IconWorld size={16} />}
+                        onClick={() => openSourceViewer(previewRecipe.source_url, previewRecipe.title)}
+                      >
+                        View Original Page
+                      </Button>
+                    )}
+
+                    <Group grow>
+                      <Button variant="light" onClick={() => setPreviewRecipe(null)}>
+                        ← Back
+                      </Button>
+                      <Button 
+                        color="green" 
+                        leftSection={<IconDownload size={18} />} 
+                        onClick={handleSaveRecipe}
+                      >
+                        Save & Select
+                      </Button>
+                    </Group>
+                  </Stack>
+                ) : (
+                  // Search UI
+                  <Tabs defaultValue="search">
+                    <Tabs.List mb="md">
+                      <Tabs.Tab value="search" leftSection={<IconSearch size={16} />}>
+                        Search
+                      </Tabs.Tab>
+                      <Tabs.Tab value="url" leftSection={<IconLink size={16} />}>
+                        URL
+                      </Tabs.Tab>
+                    </Tabs.List>
+
+                    <Tabs.Panel value="search">
+                      <Stack gap="md">
+                        <TextInput
+                          placeholder="e.g., chicken parma, beef stew..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                          rightSection={
+                            <ActionIcon color="orange" onClick={handleSearch} loading={searching}>
+                              <IconSearch size={18} />
+                            </ActionIcon>
+                          }
+                          size="md"
+                          radius="md"
+                        />
+
+                        {searching && (
+                          <Center py="xl">
+                            <Stack align="center" gap="sm">
+                              <Loader color="orange" />
+                              <Text size="sm" c="dimmed">Searching...</Text>
+                            </Stack>
+                          </Center>
+                        )}
+
+                        {!searching && searchResults.length > 0 && (
+                          <Stack gap="xs">
+                            {searchResults.map((result, i) => {
+                              const alreadyExists = isUrlExisting(result.url);
+                              return (
+                                <Paper 
+                                  key={i} 
+                                  p="sm" 
+                                  radius="md" 
+                                  withBorder
+                                  style={{ 
+                                    cursor: alreadyExists ? 'default' : 'pointer',
+                                    background: alreadyExists ? '#f0fdf4' : undefined,
+                                    borderColor: alreadyExists ? '#86efac' : undefined,
+                                  }}
+                                  onClick={() => !alreadyExists && handleImport(result.url)}
+                                >
+                                  <Group justify="space-between" align="flex-start" wrap="nowrap">
+                                    <Box style={{ flex: 1, minWidth: 0 }}>
+                                      <Group gap="xs" wrap="nowrap">
+                                        {alreadyExists && (
+                                          <IconCheck size={16} color="#22c55e" style={{ flexShrink: 0 }} />
+                                        )}
+                                        <Text fw={600} size="sm" lineClamp={1}>{result.title}</Text>
+                                      </Group>
+                                      <Text size="xs" c="dimmed" lineClamp={1}>{result.source}</Text>
+                                    </Box>
+                                    {!alreadyExists && (
+                                      <ActionIcon 
+                                        color="orange" 
+                                        variant="light" 
+                                        size="sm"
+                                        loading={importing}
+                                      >
+                                        <IconDownload size={14} />
+                                      </ActionIcon>
+                                    )}
+                                  </Group>
+                                </Paper>
+                              );
+                            })}
+                          </Stack>
+                        )}
+
+                        {!searching && searchResults.length === 0 && (
+                          <Center py="lg">
+                            <Text size="sm" c="dimmed">Enter a dish name and press Enter</Text>
+                          </Center>
+                        )}
+                      </Stack>
+                    </Tabs.Panel>
+
+                    <Tabs.Panel value="url">
+                      <Stack gap="md">
+                        <TextInput
+                          placeholder="https://..."
+                          value={importUrl}
+                          onChange={(e) => setImportUrl(e.target.value)}
+                          size="md"
+                          radius="md"
+                        />
+                        <Button 
+                          color="orange" 
+                          onClick={() => handleImport(importUrl)}
+                          disabled={!importUrl.trim()}
+                          loading={importing}
+                          leftSection={<IconDownload size={18} />}
+                        >
+                          Import Recipe
+                        </Button>
+                      </Stack>
+                    </Tabs.Panel>
+                  </Tabs>
+                )}
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+      </Modal>
+
+      {/* Notes Modal */}
+      <Modal
+        opened={notesModalOpen}
+        onClose={() => setNotesModalOpen(false)}
+        title={<Text fw={700}>📝 Add Notes</Text>}
+        size="sm"
         radius="lg"
       >
         <Stack gap="md">
-          <Select
-            label="Choose a recipe"
-            placeholder="Select a recipe..."
-            data={data.recipes.map(r => ({ 
-              value: r.id.toString(), 
-              label: `${r.icon} ${r.title}` 
-            }))}
-            value={assignRecipeId}
-            onChange={setAssignRecipeId}
-            searchable
-            size="md"
-          />
-
           <Textarea
-            label="Notes (optional)"
             placeholder="e.g., Use leftover chicken, make extra rice..."
             value={assignNotes}
             onChange={(e) => setAssignNotes(e.target.value)}
-            rows={2}
+            rows={3}
+            autoFocus
           />
-
-          <Group justify="flex-end" mt="md">
-            <Button variant="light" onClick={() => setAssignModalOpen(false)}>
+          <Group justify="flex-end">
+            <Button variant="light" onClick={() => setNotesModalOpen(false)}>
               Cancel
             </Button>
-            <Button 
-              color="orange" 
-              onClick={handleAssignRecipe}
-              disabled={!assignRecipeId}
-            >
-              Save
+            <Button color="orange" onClick={handleConfirmWithNotes}>
+              Select Recipe
             </Button>
           </Group>
         </Stack>
       </Modal>
 
-      {/* Recipe Search/Import Modal */}
-      <Modal
-        opened={searchModalOpen}
-        onClose={() => {
-          setSearchModalOpen(false);
-          setPreviewRecipe(null);
-          setSearchQuery('');
-          setSearchResults([]);
-          setImportUrl('');
-        }}
+      {/* Source Viewer Drawer */}
+      <Drawer
+        opened={!!sourceUrl}
+        onClose={() => setSourceUrl(null)}
         title={
           <Group gap="sm">
-            <IconSearch size={24} color="#fd7e14" />
-            <Text fw={700} size="lg">Find New Recipe</Text>
+            <IconWorld size={20} />
+            <Text fw={700} lineClamp={1}>{sourceTitle}</Text>
           </Group>
         }
-        size="lg"
-        radius="lg"
+        position="right"
+        size="xl"
+        padding={0}
+        styles={{
+          body: { height: 'calc(100% - 60px)', padding: 0 },
+          header: { padding: '12px 16px', borderBottom: '1px solid #e9ecef' },
+        }}
       >
-        {previewRecipe ? (
-          // Recipe Preview
-          <Stack gap="md">
-            <Paper p="md" radius="lg" style={{ background: '#fff7ed', border: '2px solid #fed7aa' }}>
-              <Group gap="md" mb="sm">
-                <Text style={{ fontSize: '2.5rem' }}>{previewRecipe.icon}</Text>
-                <Box style={{ flex: 1 }}>
-                  <Text fw={700} size="xl">{previewRecipe.title}</Text>
-                  {previewRecipe.description && (
-                    <Text c="dimmed" size="sm">{previewRecipe.description}</Text>
-                  )}
-                </Box>
-              </Group>
-              <Group gap="md">
-                {previewRecipe.prep_time && (
-                  <Badge leftSection={<IconClock size={12} />} color="orange" variant="light">
-                    {previewRecipe.prep_time}m prep
-                  </Badge>
-                )}
-                {previewRecipe.cook_time && (
-                  <Badge leftSection={<IconFlame size={12} />} color="orange" variant="light">
-                    {previewRecipe.cook_time}m cook
-                  </Badge>
-                )}
-                {previewRecipe.servings && (
-                  <Badge color="orange" variant="light">Serves {previewRecipe.servings}</Badge>
-                )}
-              </Group>
-            </Paper>
-
-            <Box>
-              <Text fw={600} mb="xs">Ingredients ({previewRecipe.ingredients?.length || 0})</Text>
-              <ScrollArea h={120}>
-                <Stack gap={4}>
-                  {previewRecipe.ingredients?.map((ing: string, i: number) => (
-                    <Text key={i} size="sm">• {ing}</Text>
-                  ))}
-                </Stack>
-              </ScrollArea>
-            </Box>
-
-            <Box>
-              <Text fw={600} mb="xs">Instructions ({previewRecipe.instructions?.length || 0} steps)</Text>
-              <ScrollArea h={120}>
-                <Stack gap={4}>
-                  {previewRecipe.instructions?.map((step: string, i: number) => (
-                    <Text key={i} size="sm">{i + 1}. {step}</Text>
-                  ))}
-                </Stack>
-              </ScrollArea>
-            </Box>
-
-            <Group justify="space-between" mt="md">
-              <Button variant="light" onClick={() => setPreviewRecipe(null)}>
-                ← Back
+        <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Paper p="xs" style={{ background: '#f8f9fa', borderBottom: '1px solid #e9ecef', flexShrink: 0 }}>
+            <Group gap="xs">
+              <Button 
+                size="xs" 
+                variant="light"
+                component="a"
+                href={sourceUrl || ''}
+                target="_blank"
+                leftSection={<IconExternalLink size={14} />}
+              >
+                Open in New Tab
               </Button>
-              <Button color="green" leftSection={<IconDownload size={18} />} onClick={handleSaveRecipe}>
-                Save Recipe
-              </Button>
+              <Text size="xs" c="dimmed" style={{ flex: 1 }} lineClamp={1}>
+                {sourceUrl}
+              </Text>
             </Group>
-          </Stack>
-        ) : (
-          // Search/Import UI
-          <Tabs defaultValue="search">
-            <Tabs.List mb="md">
-              <Tabs.Tab value="search" leftSection={<IconSearch size={16} />}>
-                Search Web
-              </Tabs.Tab>
-              <Tabs.Tab value="url" leftSection={<IconLink size={16} />}>
-                Paste URL
-              </Tabs.Tab>
-            </Tabs.List>
+          </Paper>
+          {sourceUrl && (
+            <iframe
+              src={sourceUrl}
+              style={{ 
+                flex: 1, 
+                width: '100%', 
+                border: 'none',
+              }}
+              title="Recipe Source"
+              sandbox="allow-scripts allow-same-origin"
+            />
+          )}
+        </Box>
+      </Drawer>
 
-            <Tabs.Panel value="search">
-              <Stack gap="md">
-                <Group gap="sm">
-                  <TextInput
-                    placeholder="Search for recipes... (e.g., chicken parma)"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    style={{ flex: 1 }}
-                    size="md"
-                    radius="md"
-                  />
-                  <Button 
-                    color="orange" 
-                    onClick={handleSearch} 
-                    loading={searching}
-                    leftSection={<IconSearch size={18} />}
-                  >
-                    Search
-                  </Button>
-                </Group>
-
-                {searching && (
-                  <Center py="xl">
-                    <Stack align="center" gap="sm">
-                      <Loader color="orange" size="lg" />
-                      <Text fw={600} c="orange">🔍 Searching the web...</Text>
-                      <Text size="sm" c="dimmed">This may take a few seconds</Text>
-                    </Stack>
-                  </Center>
-                )}
-
-                {!searching && searchResults.length > 0 && (
-                  <ScrollArea h={350}>
-                    <Stack gap="sm">
-                      {searchResults.map((result, i) => {
-                        const alreadyExists = isUrlExisting(result.url);
-                        return (
-                          <Paper 
-                            key={i} 
-                            p="md" 
-                            radius="md" 
-                            withBorder
-                            style={{ 
-                              cursor: alreadyExists ? 'default' : 'pointer',
-                              background: alreadyExists ? '#f0fdf4' : undefined,
-                              borderColor: alreadyExists ? '#86efac' : undefined,
-                            }}
-                            onClick={() => !alreadyExists && handleImport(result.url)}
-                          >
-                            <Group justify="space-between" align="flex-start">
-                              <Box style={{ flex: 1 }}>
-                                <Group gap="xs">
-                                  <Text fw={600} lineClamp={1}>{result.title}</Text>
-                                  {alreadyExists && (
-                                    <Tooltip label="Already in your recipes">
-                                      <Badge size="sm" color="green" variant="filled" leftSection={<IconCheck size={12} />}>
-                                        Saved
-                                      </Badge>
-                                    </Tooltip>
-                                  )}
-                                </Group>
-                                <Text size="sm" c="dimmed" lineClamp={2}>{result.description}</Text>
-                                <Group gap="xs" mt="xs">
-                                  <Badge size="sm" variant="light" color="gray">
-                                    {result.source}
-                                  </Badge>
-                                  <ActionIcon 
-                                    size="sm" 
-                                    variant="subtle" 
-                                    component="a" 
-                                    href={result.url} 
-                                    target="_blank"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <IconExternalLink size={14} />
-                                  </ActionIcon>
-                                </Group>
-                              </Box>
-                              {alreadyExists ? (
-                                <ActionIcon size="lg" color="green" variant="light" radius="xl">
-                                  <IconCheck size={20} />
-                                </ActionIcon>
-                              ) : (
-                                <Button 
-                                  size="xs" 
-                                  color="orange" 
-                                  variant="light"
-                                  loading={importing}
-                                >
-                                  Import
-                                </Button>
-                              )}
-                            </Group>
-                          </Paper>
-                        );
-                      })}
-                    </Stack>
-                  </ScrollArea>
-                )}
-
-                {!searching && searchResults.length === 0 && !searchQuery && (
-                  <Center py="xl">
-                    <Stack align="center" gap="xs">
-                      <Text size="2rem">🍳</Text>
-                      <Text c="dimmed">Type a dish and click Search</Text>
-                    </Stack>
-                  </Center>
-                )}
-              </Stack>
-            </Tabs.Panel>
-
-            <Tabs.Panel value="url">
-              <Stack gap="md">
-                <TextInput
-                  label="Recipe URL"
-                  placeholder="https://example.com/recipe..."
-                  value={importUrl}
-                  onChange={(e) => setImportUrl(e.target.value)}
-                  size="md"
-                  radius="md"
-                />
-                <Button 
-                  color="orange" 
-                  onClick={() => handleImport(importUrl)}
-                  disabled={!importUrl.trim()}
-                  loading={importing}
-                  leftSection={<IconDownload size={18} />}
-                >
-                  Import Recipe
-                </Button>
-
-                {importing && (
-                  <Center py="xl">
-                    <Stack align="center" gap="sm">
-                      <Loader color="orange" />
-                      <Text c="dimmed">Fetching and parsing recipe...</Text>
-                    </Stack>
-                  </Center>
-                )}
-              </Stack>
-            </Tabs.Panel>
-          </Tabs>
-        )}
-      </Modal>
-
+      {/* CSS for hover effect */}
+      <style>{`
+        .recipe-card-hover:hover {
+          border-color: #fd7e14 !important;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(253, 126, 20, 0.2);
+        }
+      `}</style>
     </Box>
   );
 }

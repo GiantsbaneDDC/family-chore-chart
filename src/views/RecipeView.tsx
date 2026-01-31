@@ -12,12 +12,17 @@ import {
   Group,
   Stack,
   ScrollArea,
+  Button,
+  Drawer,
+  Tooltip,
 } from '@mantine/core';
 import { 
   IconArrowLeft,
   IconClock, 
   IconFlame,
   IconUsers,
+  IconWorld,
+  IconExternalLink,
 } from '@tabler/icons-react';
 import * as api from '../api';
 import type { Recipe } from '../types';
@@ -27,6 +32,7 @@ export default function RecipeView() {
   const navigate = useNavigate();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sourceOpen, setSourceOpen] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -98,6 +104,18 @@ export default function RecipeView() {
               <Badge size="lg" variant="white" color="orange" leftSection={<IconUsers size={14} />}>
                 Serves {recipe.servings}
               </Badge>
+            )}
+            {recipe.source_url && (
+              <Tooltip label="View original recipe">
+                <ActionIcon 
+                  variant="white" 
+                  size="lg" 
+                  radius="xl"
+                  onClick={() => setSourceOpen(true)}
+                >
+                  <IconWorld size={20} />
+                </ActionIcon>
+              </Tooltip>
             )}
           </Group>
         </Group>
@@ -235,6 +253,57 @@ export default function RecipeView() {
           </ScrollArea>
         </Paper>
       </Box>
+
+      {/* Source Viewer Drawer */}
+      <Drawer
+        opened={sourceOpen}
+        onClose={() => setSourceOpen(false)}
+        title={
+          <Group gap="sm">
+            <IconWorld size={20} />
+            <Text fw={700} lineClamp={1}>Original Recipe</Text>
+          </Group>
+        }
+        position="right"
+        size="xl"
+        padding={0}
+        styles={{
+          body: { height: 'calc(100% - 60px)', padding: 0 },
+          header: { padding: '12px 16px', borderBottom: '1px solid #e9ecef' },
+        }}
+      >
+        <Box style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Paper p="xs" style={{ background: '#f8f9fa', borderBottom: '1px solid #e9ecef', flexShrink: 0 }}>
+            <Group gap="xs">
+              <Button 
+                size="xs" 
+                variant="light"
+                component="a"
+                href={recipe.source_url || ''}
+                target="_blank"
+                leftSection={<IconExternalLink size={14} />}
+              >
+                Open in New Tab
+              </Button>
+              <Text size="xs" c="dimmed" style={{ flex: 1 }} lineClamp={1}>
+                {recipe.source_url}
+              </Text>
+            </Group>
+          </Paper>
+          {recipe.source_url && (
+            <iframe
+              src={recipe.source_url}
+              style={{ 
+                flex: 1, 
+                width: '100%', 
+                border: 'none',
+              }}
+              title="Recipe Source"
+              sandbox="allow-scripts allow-same-origin"
+            />
+          )}
+        </Box>
+      </Drawer>
     </Box>
   );
 }
