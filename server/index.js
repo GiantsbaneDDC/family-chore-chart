@@ -2584,6 +2584,78 @@ If you need data, use an action first. After action results, give a friendly res
   }
 });
 
+// ================== CALENDAR API (via gog) ==================
+
+// GET /api/calendar - Get calendar events
+app.get('/api/calendar', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 7;
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() + days);
+    
+    const fromStr = today.toISOString().split('T')[0];
+    const toStr = endDate.toISOString().split('T')[0];
+    
+    const { stdout } = await execPromise(
+      `gog calendar events primary --from ${fromStr} --to ${toStr} --json`,
+      { env: { ...process.env, GOG_ACCOUNT: 'tinyerinandmatt@gmail.com' } }
+    );
+    
+    const data = JSON.parse(stdout);
+    
+    // Transform events for the frontend
+    const events = (data.events || []).map(event => ({
+      id: event.id,
+      title: event.summary || 'No title',
+      start: event.start?.dateTime || event.start?.date,
+      end: event.end?.dateTime || event.end?.date,
+      allDay: !event.start?.dateTime,
+      location: event.location || null,
+      description: event.description || null,
+      color: event.colorId || null,
+    }));
+    
+    res.json({ events });
+  } catch (err) {
+    console.error('Calendar error:', err);
+    res.status(500).json({ error: 'Failed to fetch calendar', events: [] });
+  }
+});
+
+// GET /api/calendar/today - Get just today's events
+app.get('/api/calendar/today', async (req, res) => {
+  try {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const fromStr = today.toISOString().split('T')[0];
+    const toStr = tomorrow.toISOString().split('T')[0];
+    
+    const { stdout } = await execPromise(
+      `gog calendar events primary --from ${fromStr} --to ${toStr} --json`,
+      { env: { ...process.env, GOG_ACCOUNT: 'tinyerinandmatt@gmail.com' } }
+    );
+    
+    const data = JSON.parse(stdout);
+    
+    const events = (data.events || []).map(event => ({
+      id: event.id,
+      title: event.summary || 'No title',
+      start: event.start?.dateTime || event.start?.date,
+      end: event.end?.dateTime || event.end?.date,
+      allDay: !event.start?.dateTime,
+      location: event.location || null,
+    }));
+    
+    res.json({ events });
+  } catch (err) {
+    console.error('Calendar error:', err);
+    res.status(500).json({ error: 'Failed to fetch calendar', events: [] });
+  }
+});
+
 // ================== STATIC FILES ==================
 
 // Serve audio files from /tmp

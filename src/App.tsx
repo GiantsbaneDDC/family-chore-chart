@@ -7,6 +7,7 @@ import PinEntry from './views/PinEntry';
 import RewardsView from './views/RewardsView';
 import DinnerPlanView from './views/DinnerPlanView';
 import RecipeView from './views/RecipeView';
+import CalendarView from './views/CalendarView';
 import { KioskLayout } from './components/KioskLayout';
 
 function AppRoutes() {
@@ -21,6 +22,7 @@ function AppRoutes() {
       <Route path="/rewards" element={<RewardsView />} />
       <Route path="/dinner" element={<DinnerPlanView />} />
       <Route path="/recipe/:id" element={<RecipeView />} />
+      <Route path="/calendar" element={<CalendarView />} />
     </Routes>
   );
 }
