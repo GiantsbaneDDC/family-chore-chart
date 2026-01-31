@@ -28,6 +28,46 @@ import {
 import dayjs from 'dayjs';
 import * as api from '../api';
 
+// Inject CSS animations
+const styleId = 'assistant-animations';
+if (!document.getElementById(styleId)) {
+  const style = document.createElement('style');
+  style.id = styleId;
+  style.textContent = `
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 20px rgba(124, 58, 237, 0.4), 0 0 40px rgba(124, 58, 237, 0.2); }
+      50% { box-shadow: 0 0 30px rgba(124, 58, 237, 0.6), 0 0 60px rgba(124, 58, 237, 0.3); }
+    }
+    @keyframes thinkingPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+    @keyframes wave {
+      0% { transform: rotate(0deg); }
+      10% { transform: rotate(14deg); }
+      20% { transform: rotate(-8deg); }
+      30% { transform: rotate(14deg); }
+      40% { transform: rotate(-4deg); }
+      50% { transform: rotate(10deg); }
+      60%, 100% { transform: rotate(0deg); }
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .assistant-idle { animation: pulseGlow 3s ease-in-out infinite; }
+    .assistant-thinking { animation: bounce 0.6s ease-in-out infinite; }
+    .thinking-ring { animation: spin 1.5s linear infinite; }
+    .status-bounce { animation: bounce 0.4s ease-in-out infinite; }
+    .wave-hand { animation: wave 2s ease-in-out infinite; transform-origin: 70% 70%; }
+  `;
+  document.head.appendChild(style);
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -74,8 +114,12 @@ export default function HomeView() {
   const [showWelcome, setShowWelcome] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isListening, setIsListening] = useState(false);
 
   const greeting = getGreeting();
+  
+  // Determine assistant state
+  const assistantState = sending ? 'thinking' : isListening ? 'listening' : messages.length > 0 ? 'active' : 'idle';
   const GreetingIcon = greeting.icon;
 
   const loadStats = useCallback(async () => {
@@ -282,44 +326,143 @@ export default function HomeView() {
           border: '2px solid #e9ecef',
         }}
       >
-        {/* Chat Header */}
+        {/* Chat Header with Animated Avatar */}
         <Box
           p="lg"
           style={{
             background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
             borderRadius: '22px 22px 0 0',
+            position: 'relative',
+            overflow: 'visible',
           }}
         >
-          <Group gap="md">
+          <Group gap="lg" align="center">
+            {/* Animated Assistant Head */}
             <Box
               style={{
-                width: 50,
-                height: 50,
-                borderRadius: '50%',
-                background: 'rgba(255,255,255,0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                position: 'relative',
+                width: 70,
+                height: 70,
               }}
             >
-              <IconRobot size={30} color="white" />
+              {/* Glow ring */}
+              <Box
+                className={assistantState === 'thinking' ? 'thinking-ring' : undefined}
+                style={{
+                  position: 'absolute',
+                  inset: -4,
+                  borderRadius: '50%',
+                  background: assistantState === 'thinking' 
+                    ? 'conic-gradient(from 0deg, #a78bfa, #7c3aed, #5b21b6, #7c3aed, #a78bfa)'
+                    : 'transparent',
+                  opacity: assistantState === 'thinking' ? 1 : 0,
+                  transition: 'opacity 0.3s',
+                }}
+              />
+              
+              {/* Main head */}
+              <Box
+                className={assistantState === 'idle' ? 'assistant-idle' : assistantState === 'thinking' ? 'assistant-thinking' : undefined}
+                style={{
+                  width: 70,
+                  height: 70,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.2), inset 0 2px 4px rgba(255,255,255,0.8)',
+                }}
+              >
+                {/* Face */}
+                <Box style={{ position: 'relative', width: 50, height: 50 }}>
+                  {/* Eyes */}
+                  <Box
+                    style={{
+                      position: 'absolute',
+                      top: 14,
+                      left: 8,
+                      width: 12,
+                      height: assistantState === 'thinking' ? 4 : 12,
+                      borderRadius: assistantState === 'thinking' ? 2 : '50%',
+                      background: '#7c3aed',
+                      transition: 'all 0.2s',
+                    }}
+                  />
+                  <Box
+                    style={{
+                      position: 'absolute',
+                      top: 14,
+                      right: 8,
+                      width: 12,
+                      height: assistantState === 'thinking' ? 4 : 12,
+                      borderRadius: assistantState === 'thinking' ? 2 : '50%',
+                      background: '#7c3aed',
+                      transition: 'all 0.2s',
+                    }}
+                  />
+                  {/* Eye shine */}
+                  {assistantState !== 'thinking' && (
+                    <>
+                      <Box style={{ position: 'absolute', top: 16, left: 12, width: 4, height: 4, borderRadius: '50%', background: 'white' }} />
+                      <Box style={{ position: 'absolute', top: 16, right: 12, width: 4, height: 4, borderRadius: '50%', background: 'white' }} />
+                    </>
+                  )}
+                  {/* Mouth */}
+                  <Box
+                    style={{
+                      position: 'absolute',
+                      bottom: 8,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: assistantState === 'thinking' ? 8 : 20,
+                      height: assistantState === 'thinking' ? 8 : 10,
+                      borderRadius: assistantState === 'thinking' ? '50%' : '0 0 10px 10px',
+                      background: '#7c3aed',
+                      transition: 'all 0.2s',
+                    }}
+                  />
+                </Box>
+              </Box>
+              
+              {/* Status indicator */}
+              <Box
+                className={assistantState === 'thinking' ? 'status-bounce' : undefined}
+                style={{
+                  position: 'absolute',
+                  bottom: 2,
+                  right: 2,
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  background: assistantState === 'thinking' ? '#f59e0b' : '#22c55e',
+                  border: '3px solid white',
+                  boxShadow: `0 0 8px ${assistantState === 'thinking' ? '#f59e0b' : '#22c55e'}`,
+                }}
+              />
             </Box>
-            <Box>
+            
+            <Box style={{ flex: 1 }}>
               <Title order={3} c="white">Family Assistant</Title>
-              <Text c="white" size="sm" style={{ opacity: 0.8 }}>
-                Ask me anything about chores, meals, or stars!
+              <Text c="white" size="sm" style={{ opacity: 0.9 }}>
+                {assistantState === 'thinking' 
+                  ? "🤔 Thinking..." 
+                  : assistantState === 'active'
+                    ? "💬 Here to help!"
+                    : "Ask me anything about chores, meals, or stars!"}
               </Text>
             </Box>
-            <Box 
-              ml="auto" 
-              style={{ 
-                width: 12, 
-                height: 12, 
-                borderRadius: '50%', 
-                background: '#22c55e',
-                boxShadow: '0 0 8px #22c55e',
-              }} 
-            />
+            
+            {/* Waving hand when idle and no messages */}
+            {messages.length === 0 && !sending && (
+              <Text 
+                className="wave-hand"
+                style={{ fontSize: '2rem' }}
+              >
+                👋
+              </Text>
+            )}
           </Group>
         </Box>
 
