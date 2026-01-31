@@ -246,6 +246,12 @@ export default function HomeView() {
   };
 
   const stopSpeaking = () => {
+    // Stop ElevenLabs audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    // Stop browser TTS
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
   };
@@ -299,6 +305,8 @@ export default function HomeView() {
     }
   }, [messages]);
 
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  
   const sendMessageWithText = async (text: string) => {
     if (!text.trim() || sending) return;
 
@@ -318,7 +326,7 @@ export default function HomeView() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage.content }),
+        body: JSON.stringify({ message: userMessage.content, voice: true }),
       });
 
       const data = await response.json();
@@ -333,8 +341,25 @@ export default function HomeView() {
 
       setMessages(prev => [...prev, assistantMessage]);
       
-      // Speak the response
-      speak(replyText);
+      // Play ElevenLabs audio if available
+      if (data.audioUrl) {
+        setIsSpeaking(true);
+        const audio = new Audio(data.audioUrl);
+        audioRef.current = audio;
+        audio.onended = () => setIsSpeaking(false);
+        audio.onerror = () => {
+          setIsSpeaking(false);
+          // Fallback to browser TTS
+          speak(replyText);
+        };
+        audio.play().catch(() => {
+          setIsSpeaking(false);
+          speak(replyText);
+        });
+      } else {
+        // Fallback to browser TTS
+        speak(replyText);
+      }
     } catch (err) {
       console.error('Failed to send message:', err);
       const errorMsg = "Sorry, I couldn't process that. Try again in a moment!";
@@ -347,7 +372,6 @@ export default function HomeView() {
       speak(errorMsg);
     } finally {
       setSending(false);
-      inputRef.current?.focus();
     }
   };
 
@@ -724,80 +748,53 @@ export default function HomeView() {
           </Stack>
         </ScrollArea>
 
-        {/* Chat Input */}
-        <Box p="lg" style={{ borderTop: '2px solid #e9ecef', background: 'white' }}>
-          <Group gap="sm">
-            {/* Voice toggle */}
-            <Tooltip label={voiceEnabled ? 'Voice responses on' : 'Voice responses off'}>
+        {/* Voice Input - Big Mic Button */}
+        <Box p="xl" style={{ borderTop: '2px solid #e9ecef', background: 'white' }}>
+          <Center>
+            <Stack align="center" gap="md">
+              {/* Main Mic Button */}
               <ActionIcon 
-                size={50} 
+                size={100} 
                 radius="xl" 
-                color={voiceEnabled ? 'violet' : 'gray'}
-                variant="light"
-                onClick={() => {
-                  setVoiceEnabled(!voiceEnabled);
-                  if (isSpeaking) stopSpeaking();
-                }}
-              >
-                <IconVolume size={24} />
-              </ActionIcon>
-            </Tooltip>
-            
-            {/* Microphone button */}
-            <Tooltip label={isListening ? 'Listening... (tap to stop)' : 'Tap to speak'}>
-              <ActionIcon 
-                size={50} 
-                radius="xl" 
-                color={isListening ? 'red' : 'violet'}
-                variant={isListening ? 'filled' : 'light'}
-                onClick={toggleListening}
+                color={isListening ? 'red' : isSpeaking ? 'green' : 'violet'}
+                variant="filled"
+                onClick={isSpeaking ? stopSpeaking : toggleListening}
                 disabled={sending}
                 className={isListening ? 'status-bounce' : undefined}
+                style={{
+                  boxShadow: isListening 
+                    ? '0 0 30px rgba(239, 68, 68, 0.5)' 
+                    : isSpeaking 
+                      ? '0 0 30px rgba(34, 197, 94, 0.5)'
+                      : '0 0 20px rgba(124, 58, 237, 0.3)',
+                  transition: 'all 0.3s',
+                }}
               >
-                {isListening ? <IconPlayerStop size={24} /> : <IconMicrophone size={24} />}
+                {isSpeaking ? (
+                  <IconPlayerStop size={50} />
+                ) : isListening ? (
+                  <IconPlayerStop size={50} />
+                ) : (
+                  <IconMicrophone size={50} />
+                )}
               </ActionIcon>
-            </Tooltip>
-            
-            <TextInput
-              ref={inputRef}
-              placeholder={isListening ? "Listening..." : "Type or tap mic to speak..."}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-              disabled={sending || isListening}
-              size="lg"
-              radius="xl"
-              style={{ flex: 1 }}
-              styles={{
-                input: {
-                  border: isListening ? '2px solid #ef4444' : '2px solid #e9ecef',
-                  background: isListening ? '#fef2f2' : 'white',
-                },
-              }}
-            />
-            
-            <ActionIcon 
-              size={50} 
-              radius="xl" 
-              color="violet"
-              variant="filled"
-              onClick={sendMessage}
-              disabled={!input.trim() || sending}
-            >
-              <IconSend size={24} />
-            </ActionIcon>
-          </Group>
-          
-          {/* Speaking indicator */}
-          {isSpeaking && (
-            <Group gap="xs" mt="sm" justify="center">
-              <Box className="status-bounce" style={{ width: 8, height: 8, borderRadius: '50%', background: '#7c3aed' }} />
-              <Text size="sm" c="violet">Speaking...</Text>
-              <ActionIcon size="sm" variant="subtle" color="violet" onClick={stopSpeaking}>
-                <IconPlayerStop size={14} />
-              </ActionIcon>
-            </Group>
-          )}
+              
+              {/* Status Text */}
+              <Text 
+                size="lg" 
+                fw={600} 
+                c={isListening ? 'red' : isSpeaking ? 'green' : 'dimmed'}
+              >
+                {sending 
+                  ? '🤔 Thinking...' 
+                  : isListening 
+                    ? '🎤 Listening... (tap to stop)' 
+                    : isSpeaking 
+                      ? '🔊 Speaking... (tap to stop)'
+                      : 'Tap to speak'}
+              </Text>
+            </Stack>
+          </Center>
         </Box>
       </Paper>
     </Box>

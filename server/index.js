@@ -1752,9 +1752,13 @@ app.post('/api/dinner-plan/copy-week', async (req, res) => {
 
 // ================== CHAT API (Family Assistant via Clawdbot) ==================
 
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
+
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, voice = true } = req.body;
     
     // Get current family data for context
     const weekStart = getWeekStart();
@@ -1839,7 +1843,31 @@ IMPORTANT: When someone asks to ADD/CHANGE something (like meals or chores), exp
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content || "I'm having trouble thinking right now. Try again!";
     
-    res.json({ reply });
+    // Generate audio if voice is enabled
+    let audioUrl = null;
+    if (voice) {
+      try {
+        const audioFile = `/tmp/assistant-${Date.now()}.mp3`;
+        // Clean text for speech (remove markdown, emojis)
+        const cleanText = reply
+          .replace(/\*\*/g, '')
+          .replace(/[#*_~`]/g, '')
+          .replace(/\n+/g, ' ')
+          .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
+          .trim();
+        
+        // Use sag for TTS
+        await execPromise(`sag -o "${audioFile}" "${cleanText.replace(/"/g, '\\"')}"`, {
+          env: { ...process.env, ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY || '' }
+        });
+        
+        audioUrl = `/audio/${path.basename(audioFile)}`;
+      } catch (ttsErr) {
+        console.error('TTS error:', ttsErr);
+      }
+    }
+    
+    res.json({ reply, audioUrl });
   } catch (err) {
     console.error('Error in chat:', err);
     res.status(500).json({ reply: "Oops! I couldn't connect to my brain. Try again in a moment! 🤔" });
@@ -1847,6 +1875,9 @@ IMPORTANT: When someone asks to ADD/CHANGE something (like meals or chores), exp
 });
 
 // ================== STATIC FILES ==================
+
+// Serve audio files from /tmp
+app.use('/audio', express.static('/tmp'));
 
 // Serve static files from dist
 app.use(express.static(distPath));
