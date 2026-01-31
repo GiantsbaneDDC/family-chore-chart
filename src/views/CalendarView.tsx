@@ -11,6 +11,7 @@ import {
   ActionIcon,
   Badge,
   ScrollArea,
+  SegmentedControl,
 } from '@mantine/core';
 import { IconChevronLeft, IconChevronRight, IconCalendar, IconClock, IconMapPin } from '@tabler/icons-react';
 import dayjs from 'dayjs';
@@ -41,26 +42,29 @@ const colorMap: Record<string, string> = {
   '11': '#d50000',
 };
 
+type ViewMode = '1week' | '2weeks' | 'month';
+
 export default function CalendarView() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [weekOffset, setWeekOffset] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [viewMode, setViewMode] = useState<ViewMode>('2weeks');
 
-  const getWeekDates = () => {
-    const start = dayjs().startOf('week').add(weekOffset * 7, 'day');
-    return Array.from({ length: 7 }, (_, i) => start.add(i, 'day'));
+  const getDates = () => {
+    const start = dayjs().startOf('week').add(offset * 7, 'day');
+    const numDays = viewMode === '1week' ? 7 : viewMode === '2weeks' ? 14 : 35;
+    return Array.from({ length: numDays }, (_, i) => start.add(i, 'day'));
   };
 
-  const weekDates = getWeekDates();
-  const weekStart = weekDates[0];
-  const weekEnd = weekDates[6];
+  const dates = getDates();
+  const viewStart = dates[0];
+  const viewEnd = dates[dates.length - 1];
 
   const loadEvents = useCallback(async () => {
     try {
       setLoading(true);
-      const from = weekStart.format('YYYY-MM-DD');
-      const to = weekEnd.add(1, 'day').format('YYYY-MM-DD');
-      const res = await fetch(`/api/calendar?days=14&from=${from}&to=${to}`);
+      const days = viewMode === '1week' ? 14 : viewMode === '2weeks' ? 21 : 42;
+      const res = await fetch(`/api/calendar?days=${days}`);
       const data = await res.json();
       setEvents(data.events || []);
     } catch (err) {
@@ -68,7 +72,7 @@ export default function CalendarView() {
     } finally {
       setLoading(false);
     }
-  }, [weekOffset]);
+  }, [offset, viewMode]);
 
   useEffect(() => {
     loadEvents();
@@ -95,14 +99,16 @@ export default function CalendarView() {
   };
 
   const isToday = (date: dayjs.Dayjs) => date.isSame(dayjs(), 'day');
-  const isCurrentWeek = weekOffset === 0;
+  const isCurrentView = offset === 0;
 
-  const formatWeekRange = () => {
-    if (weekStart.month() === weekEnd.month()) {
-      return `${weekStart.format('MMM D')} - ${weekEnd.format('D, YYYY')}`;
+  const formatDateRange = () => {
+    if (viewStart.month() === viewEnd.month()) {
+      return `${viewStart.format('MMM D')} - ${viewEnd.format('D, YYYY')}`;
     }
-    return `${weekStart.format('MMM D')} - ${weekEnd.format('MMM D, YYYY')}`;
+    return `${viewStart.format('MMM D')} - ${viewEnd.format('MMM D, YYYY')}`;
   };
+  
+  const getNavStep = () => viewMode === '1week' ? 1 : viewMode === '2weeks' ? 2 : 4;
 
   if (loading && events.length === 0) {
     return (
@@ -132,7 +138,7 @@ export default function CalendarView() {
               variant="white"
               size="lg"
               radius="xl"
-              onClick={() => setWeekOffset(w => w - 1)}
+              onClick={() => setOffset(o => o - getNavStep())}
             >
               <IconChevronLeft size={20} />
             </ActionIcon>
@@ -142,30 +148,47 @@ export default function CalendarView() {
                 Family Calendar
               </Title>
               <Text size="sm" c="white" style={{ opacity: 0.9 }}>
-                {formatWeekRange()}
+                {formatDateRange()}
               </Text>
             </Box>
             <ActionIcon
               variant="white"
               size="lg"
               radius="xl"
-              onClick={() => setWeekOffset(w => w + 1)}
+              onClick={() => setOffset(o => o + getNavStep())}
             >
               <IconChevronRight size={20} />
             </ActionIcon>
           </Group>
           
-          {!isCurrentWeek && (
-            <Badge
-              size="lg"
-              variant="white"
-              color="cyan"
-              style={{ cursor: 'pointer' }}
-              onClick={() => setWeekOffset(0)}
-            >
-              Back to This Week
-            </Badge>
-          )}
+          <Group gap="sm">
+            <SegmentedControl
+              size="xs"
+              value={viewMode}
+              onChange={(v) => { setViewMode(v as ViewMode); setOffset(0); }}
+              data={[
+                { label: '1 Week', value: '1week' },
+                { label: '2 Weeks', value: '2weeks' },
+                { label: 'Month', value: 'month' },
+              ]}
+              styles={{
+                root: { background: 'rgba(255,255,255,0.2)' },
+                label: { color: 'white', fontWeight: 500 },
+                indicator: { background: 'white' },
+              }}
+            />
+            {!isCurrentView && (
+              <Badge
+                size="lg"
+                variant="white"
+                color="cyan"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setOffset(0)}
+              >
+                Today
+              </Badge>
+            )}
+          </Group>
         </Group>
       </Paper>
 
@@ -179,40 +202,44 @@ export default function CalendarView() {
               gap: 8,
             }}
           >
-            {weekDates.map((date, idx) => {
+            {dates.map((date, idx) => {
               const dayEvents = getEventsForDate(date);
               const today = isToday(date);
+              const isWeekend = date.day() === 0 || date.day() === 6;
+              
+              const compact = viewMode !== '1week';
               
               return (
                 <Box
                   key={idx}
                   style={{
-                    minHeight: 180,
+                    minHeight: compact ? 120 : 180,
                     background: today 
                       ? 'linear-gradient(180deg, #ecfeff 0%, #cffafe 100%)'
-                      : '#f8fafc',
-                    borderRadius: 16,
-                    padding: 12,
+                      : isWeekend ? '#f1f5f9' : '#f8fafc',
+                    borderRadius: compact ? 12 : 16,
+                    padding: compact ? 8 : 12,
                     border: today ? '2px solid #06b6d4' : '1px solid #e2e8f0',
                   }}
                 >
                   {/* Day Header */}
-                  <Box mb="xs" style={{ textAlign: 'center' }}>
+                  <Box mb={compact ? 4 : 'xs'} style={{ textAlign: 'center' }}>
                     <Text size="xs" c="dimmed" fw={500} tt="uppercase">
                       {date.format('ddd')}
                     </Text>
                     <Text 
-                      size="xl" 
+                      size={compact ? 'md' : 'xl'}
                       fw={700} 
                       c={today ? 'cyan' : 'dark'}
                       style={{
-                        width: 36,
-                        height: 36,
-                        lineHeight: '36px',
+                        width: compact ? 28 : 36,
+                        height: compact ? 28 : 36,
+                        lineHeight: compact ? '28px' : '36px',
                         borderRadius: '50%',
                         background: today ? '#06b6d4' : 'transparent',
                         color: today ? 'white' : undefined,
                         margin: '0 auto',
+                        fontSize: compact ? 14 : undefined,
                       }}
                     >
                       {date.format('D')}
@@ -220,27 +247,29 @@ export default function CalendarView() {
                   </Box>
 
                   {/* Events */}
-                  <Stack gap={6}>
+                  <Stack gap={compact ? 3 : 6}>
                     {dayEvents.length === 0 ? (
-                      <Text size="xs" c="dimmed" ta="center" style={{ opacity: 0.5 }}>
-                        No events
-                      </Text>
+                      !compact && (
+                        <Text size="xs" c="dimmed" ta="center" style={{ opacity: 0.5 }}>
+                          No events
+                        </Text>
+                      )
                     ) : (
-                      dayEvents.slice(0, 4).map(event => (
+                      dayEvents.slice(0, compact ? 3 : 4).map(event => (
                         <Box
                           key={event.id}
-                          p={6}
+                          p={compact ? 4 : 6}
                           style={{
                             background: 'white',
-                            borderRadius: 8,
+                            borderRadius: compact ? 6 : 8,
                             borderLeft: `3px solid ${event.color ? colorMap[event.color] || '#06b6d4' : '#06b6d4'}`,
                             boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                           }}
                         >
-                          <Text size="xs" fw={600} lineClamp={1}>
+                          <Text size="xs" fw={600} lineClamp={1} style={{ fontSize: compact ? 11 : 12 }}>
                             {event.title}
                           </Text>
-                          {!event.allDay && (
+                          {!event.allDay && !compact && (
                             <Text size="xs" c="dimmed">
                               {formatTime(event.start)}
                             </Text>
@@ -248,9 +277,9 @@ export default function CalendarView() {
                         </Box>
                       ))
                     )}
-                    {dayEvents.length > 4 && (
-                      <Text size="xs" c="dimmed" ta="center">
-                        +{dayEvents.length - 4} more
+                    {dayEvents.length > (compact ? 3 : 4) && (
+                      <Text size="xs" c="dimmed" ta="center" style={{ fontSize: 10 }}>
+                        +{dayEvents.length - (compact ? 3 : 4)} more
                       </Text>
                     )}
                   </Stack>
@@ -265,11 +294,11 @@ export default function CalendarView() {
       <Paper p="md" radius="xl" shadow="sm">
         <Title order={5} mb="sm" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <IconClock size={18} />
-          {isCurrentWeek ? "Today's Schedule" : `${weekDates[0].format('MMM D')} Schedule`}
+          {isCurrentView ? "Today's Schedule" : `${dates[0].format('MMM D')} Schedule`}
         </Title>
         
         {(() => {
-          const todayEvents = getEventsForDate(isCurrentWeek ? dayjs() : weekDates[0]);
+          const todayEvents = getEventsForDate(isCurrentView ? dayjs() : dates[0]);
           
           if (todayEvents.length === 0) {
             return (
