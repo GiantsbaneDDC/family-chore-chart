@@ -4,7 +4,6 @@ import KidView from './views/KidView';
 import AdminView from './views/AdminView';
 import PinEntry from './views/PinEntry';
 import RewardsView from './views/RewardsView';
-import BonusView from './views/BonusView';
 import DinnerPlanView from './views/DinnerPlanView';
 import RecipeView from './views/RecipeView';
 import { KioskLayout } from './components/KioskLayout';
@@ -18,7 +17,6 @@ function AppRoutes() {
       <Route path="/my" element={<PinEntry />} />
       <Route path="/admin" element={<AdminView />} />
       <Route path="/rewards" element={<RewardsView />} />
-      <Route path="/bonus" element={<BonusView />} />
       <Route path="/dinner" element={<DinnerPlanView />} />
       <Route path="/recipe/:id" element={<RecipeView />} />
     </Routes>

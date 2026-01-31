@@ -85,19 +85,22 @@ export default function RecipeView() {
           </Group>
           <Group gap="md">
             {recipe.prep_time && (
-              <Badge size="xl" variant="white" color="orange" leftSection={<IconClock size={18} />} style={{ fontSize: '1.1rem', padding: '14px 18px' }}>
-                {recipe.prep_time} min prep
-              </Badge>
+              <Paper px="md" py="xs" radius="xl" style={{ background: 'white', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <IconClock size={20} color="#fd7e14" />
+                <Text size="lg" fw={600} c="dark">{recipe.prep_time} min prep</Text>
+              </Paper>
             )}
             {recipe.cook_time && (
-              <Badge size="xl" variant="white" color="orange" leftSection={<IconFlame size={18} />} style={{ fontSize: '1.1rem', padding: '14px 18px' }}>
-                {recipe.cook_time} min cook
-              </Badge>
+              <Paper px="md" py="xs" radius="xl" style={{ background: 'white', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <IconFlame size={20} color="#fd7e14" />
+                <Text size="lg" fw={600} c="dark">{recipe.cook_time} min cook</Text>
+              </Paper>
             )}
             {recipe.servings && (
-              <Badge size="xl" variant="white" color="orange" leftSection={<IconUsers size={18} />} style={{ fontSize: '1.1rem', padding: '14px 18px' }}>
-                Serves {recipe.servings}
-              </Badge>
+              <Paper px="md" py="xs" radius="xl" style={{ background: 'white', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <IconUsers size={20} color="#fd7e14" />
+                <Text size="lg" fw={600} c="dark">Serves {recipe.servings}</Text>
+              </Paper>
             )}
           </Group>
         </Group>
