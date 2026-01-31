@@ -67,10 +67,9 @@ export default function RewardsView() {
 
   return (
     <FitToScreen
-      baseWidth={1600}
-      baseHeight={900}
       background="linear-gradient(135deg, #fef3c7 0%, #fce7f3 50%, #ddd6fe 100%)"
-      padding={24}
+      padding={16}
+      minScreenWidth={768}
     >
     <Box className="kiosk-container safe-area-padding" style={{ background: 'transparent' }}>
       {/* Header */}

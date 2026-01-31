@@ -304,13 +304,16 @@ body {
 
 @media (min-width: 768px) {
   .kiosk-container {
-    /* Fixed size container - gets scaled by FitToScreen */
-    width: 100%;
-    height: 100%;
+    /* Fixed kiosk size - will be scaled to fit viewport */
+    width: 1400px;
+    height: 900px;
+    min-height: auto;
     padding: 24px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
   }
 }
 
@@ -692,13 +695,17 @@ body {
 
 @media (min-width: 768px) {
   .kid-container {
-    /* Fixed size - scaled by FitToScreen */
-    width: 100%;
-    height: 100%;
+    /* Fixed kiosk size - will be scaled to fit viewport */
+    width: 1400px;
+    height: 900px;
+    min-height: auto;
     padding: 24px;
+    padding-bottom: 24px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
   }
 }
 

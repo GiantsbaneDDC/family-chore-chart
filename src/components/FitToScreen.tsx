@@ -4,48 +4,39 @@ interface FitToScreenProps {
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
-  /** Base width the content is designed for */
-  baseWidth?: number;
-  /** Base height the content is designed for */
-  baseHeight?: number;
-  /** Minimum scale factor */
-  minScale?: number;
-  /** Maximum scale factor */
-  maxScale?: number;
-  /** Padding from edges */
-  padding?: number;
-  /** Only apply on screens wider than this (mobile stays normal) */
+  /** Minimum screen width to apply scaling (below this = mobile scroll) */
   minScreenWidth?: number;
+  /** Padding from viewport edges */
+  padding?: number;
   /** Background color for the outer container */
   background?: string;
 }
 
 /**
- * Scales content proportionally to fit the viewport.
- * Based on CSS-Tricks best practice: https://css-tricks.com/scaled-proportional-blocks-with-css-and-javascript/
+ * Scales content to fit the viewport without scrolling.
+ * Measures actual content size and scales it down to fit.
+ * Mobile devices (below minScreenWidth) render normally with scroll.
  */
 export function FitToScreen({
   children,
   className = '',
   style = {},
-  baseWidth = 1920,
-  baseHeight = 1080,
-  minScale = 0.3,
-  maxScale = 1.5,
-  padding = 16,
   minScreenWidth = 768,
+  padding = 24,
   background = 'inherit',
 }: FitToScreenProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const outerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [isMobile, setIsMobile] = useState(false);
+  const [contentSize, setContentSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     const calculateScale = () => {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
-      // On mobile, don't scale - just scroll normally
+      // Mobile: don't scale, just scroll
       if (vw < minScreenWidth) {
         setIsMobile(true);
         setScale(1);
@@ -54,47 +45,70 @@ export function FitToScreen({
 
       setIsMobile(false);
 
-      // Available space
+      if (!innerRef.current) return;
+
+      // Reset scale to measure natural size
+      innerRef.current.style.transform = 'scale(1)';
+      
+      // Force reflow
+      void innerRef.current.offsetHeight;
+
+      // Measure the content's natural size
+      const contentWidth = innerRef.current.scrollWidth;
+      const contentHeight = innerRef.current.scrollHeight;
+      
+      setContentSize({ width: contentWidth, height: contentHeight });
+
+      // Available viewport space
       const availableWidth = vw - padding * 2;
       const availableHeight = vh - padding * 2;
 
-      // Calculate scale to fit both dimensions
-      const scaleX = availableWidth / baseWidth;
-      const scaleY = availableHeight / baseHeight;
+      // Calculate scale to fit
+      const scaleX = availableWidth / contentWidth;
+      const scaleY = availableHeight / contentHeight;
       
-      // Use the smaller to ensure it fits
-      let newScale = Math.min(scaleX, scaleY);
+      // Use the smaller scale to ensure it fits both dimensions
+      let newScale = Math.min(scaleX, scaleY, 1); // Cap at 1 - never scale up
       
-      // Clamp to bounds
-      newScale = Math.max(minScale, Math.min(maxScale, newScale));
+      // Don't go too small
+      newScale = Math.max(0.5, newScale);
 
       setScale(newScale);
     };
 
+    // Calculate on mount and resize
     calculateScale();
+    
+    // Recalculate after fonts/images load
+    const timers = [
+      setTimeout(calculateScale, 100),
+      setTimeout(calculateScale, 500),
+      setTimeout(calculateScale, 1000),
+    ];
 
     window.addEventListener('resize', calculateScale);
     window.addEventListener('orientationchange', calculateScale);
 
     return () => {
+      timers.forEach(clearTimeout);
       window.removeEventListener('resize', calculateScale);
       window.removeEventListener('orientationchange', calculateScale);
     };
-  }, [baseWidth, baseHeight, minScale, maxScale, padding, minScreenWidth]);
+  }, [minScreenWidth, padding]);
 
   // Mobile: render normally with scroll
   if (isMobile) {
     return (
-      <div className={className} style={style}>
+      <div className={className} style={{ ...style, background }}>
         {children}
       </div>
     );
   }
 
-  // Desktop: scale to fit
+  // Desktop/Tablet: scale to fit viewport
   return (
     <div
-      ref={containerRef}
+      ref={outerRef}
       style={{
         width: '100vw',
         height: '100vh',
@@ -106,14 +120,12 @@ export function FitToScreen({
       }}
     >
       <div
+        ref={innerRef}
         className={className}
         style={{
           ...style,
-          width: baseWidth,
-          height: baseHeight,
           transform: `scale(${scale})`,
           transformOrigin: 'center center',
-          overflow: 'hidden',
         }}
       >
         {children}

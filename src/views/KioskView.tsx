@@ -139,10 +139,9 @@ export default function KioskView() {
 
   return (
     <FitToScreen
-      baseWidth={1600}
-      baseHeight={900}
       background="linear-gradient(180deg, #f0f9ff 0%, #f8fafc 50%, #ffffff 100%)"
-      padding={24}
+      padding={16}
+      minScreenWidth={768}
     >
     <Box className="kiosk-container safe-area-padding">
       {/* Desktop Header */}

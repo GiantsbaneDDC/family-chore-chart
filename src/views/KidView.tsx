@@ -308,10 +308,9 @@ export default function KidView() {
 
   return (
     <FitToScreen
-      baseWidth={1400}
-      baseHeight={900}
       background={`linear-gradient(180deg, ${member.color}15 0%, ${member.color}05 30%, white 100%)`}
-      padding={24}
+      padding={16}
+      minScreenWidth={768}
     >
     <Box 
       className="kid-container safe-area-padding"
