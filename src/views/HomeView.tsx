@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import Markdown from 'react-markdown';
 import {
   Box,
   Text,
@@ -70,6 +71,17 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
       background-size: 200% 100%;
       animation: shimmer 2s infinite;
     }
+    .markdown-content p { margin: 0 0 0.5em 0; }
+    .markdown-content p:last-child { margin-bottom: 0; }
+    .markdown-content ul, .markdown-content ol { margin: 0.5em 0; padding-left: 1.5em; }
+    .markdown-content li { margin: 0.25em 0; }
+    .markdown-content strong { font-weight: 700; }
+    .markdown-content em { font-style: italic; }
+    .markdown-content code { background: #e2e8f0; padding: 0.1em 0.3em; border-radius: 4px; font-size: 0.9em; }
+    .markdown-content h1, .markdown-content h2, .markdown-content h3 { margin: 0.5em 0 0.25em 0; font-weight: 700; }
+    .markdown-content h1 { font-size: 1.25em; }
+    .markdown-content h2 { font-size: 1.1em; }
+    .markdown-content h3 { font-size: 1em; }
   `;
   document.head.appendChild(style);
 }
@@ -711,10 +723,15 @@ export default function HomeView() {
                           ? 'linear-gradient(135deg, #3b82f6, #06b6d4)' 
                           : '#f1f5f9',
                       }}
+                      className={msg.role === 'assistant' ? 'assistant-message' : ''}
                     >
-                      <Text c={msg.role === 'user' ? 'white' : 'dark'} size="sm">
-                        {msg.content}
-                      </Text>
+                      {msg.role === 'user' ? (
+                        <Text c="white" size="sm">{msg.content}</Text>
+                      ) : (
+                        <Box className="markdown-content" style={{ fontSize: '0.875rem', color: '#1a1a1a' }}>
+                          <Markdown>{msg.content}</Markdown>
+                        </Box>
+                      )}
                     </Paper>
                   </Box>
                 ))}
