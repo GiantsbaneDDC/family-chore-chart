@@ -1776,35 +1776,40 @@ app.post('/api/chat', async (req, res) => {
       pool.query('SELECT name, avatar, total_stars FROM family_members ORDER BY total_stars DESC')
     ]);
     
-    // Build context string
-    let context = `You are a friendly Family Assistant for the household. Today is ${days[todayDow]}.\n\n`;
-    
-    context += `FAMILY MEMBERS: ${membersResult.rows.map(m => `${m.avatar} ${m.name} (${m.total_stars || 0} stars)`).join(', ')}\n\n`;
-    
+    // Calculate chore stats first
     const totalChores = choreStats.rows.reduce((sum, r) => sum + parseInt(r.total), 0);
     const doneChores = choreStats.rows.reduce((sum, r) => sum + parseInt(r.done), 0);
-    context += `TODAY'S CHORES: ${doneChores}/${totalChores} complete\n`;
-    choreStats.rows.forEach(m => {
-      if (parseInt(m.total) > 0) {
-        context += `  ${m.avatar} ${m.name}: ${m.done}/${m.total}${parseInt(m.done) === parseInt(m.total) ? ' ✅' : ''}\n`;
-      }
-    });
     
-    context += `\nDINNER PLAN THIS WEEK:\n`;
-    days.forEach((day, i) => {
-      const plan = dinnerPlan.rows.find(r => r.day_of_week === i);
-      context += `  ${day}: ${plan ? `${plan.icon} ${plan.title}` : 'Not planned'}\n`;
-    });
-    
-    if (leaderboard.rows.length > 0) {
-      context += `\nSTAR LEADERBOARD:\n`;
-      leaderboard.rows.forEach((m, i) => {
-        const medals = ['🥇', '🥈', '🥉'];
-        context += `  ${medals[i] || `${i+1}.`} ${m.avatar} ${m.name}: ${m.total_stars || 0} stars\n`;
-      });
-    }
-    
-    context += `\nBe helpful, friendly, and concise. Use emojis. This is a family app displayed on a tablet.`;
+    // Build context string
+    let context = `You are the Family Assistant for this household's Family Hub app (displayed on a tablet).
+Today is ${days[todayDow]}.
+
+YOUR ROLE:
+- Help the family with chores, meal planning, and tracking stars/rewards
+- Answer questions about the household data shown below
+- You can also chat generally, tell jokes, help with homework, etc.
+- Keep responses SHORT and friendly (1-3 sentences usually) - this is spoken aloud
+- Use simple language suitable for kids ages 8-14
+
+FAMILY MEMBERS: ${membersResult.rows.map(m => `${m.avatar} ${m.name} (${m.total_stars || 0} stars)`).join(', ')}
+
+TODAY'S CHORES (${doneChores}/${totalChores} complete):
+${choreStats.rows.filter(m => parseInt(m.total) > 0).map(m => `  ${m.avatar} ${m.name}: ${m.done}/${m.total}${parseInt(m.done) === parseInt(m.total) ? ' ✅' : ''}`).join('\n')}
+
+DINNER PLAN THIS WEEK:
+${days.map((day, i) => {
+  const plan = dinnerPlan.rows.find(r => r.day_of_week === i);
+  const isToday = i === todayDow;
+  return `  ${isToday ? '👉 ' : ''}${day}: ${plan ? `${plan.icon} ${plan.title}` : 'Not planned'}`;
+}).join('\n')}
+
+STAR LEADERBOARD:
+${leaderboard.rows.map((m, i) => {
+  const medals = ['🥇', '🥈', '🥉'];
+  return `  ${medals[i] || `${i+1}.`} ${m.avatar} ${m.name}: ${m.total_stars || 0} stars`;
+}).join('\n')}
+
+IMPORTANT: When someone asks to ADD/CHANGE something (like meals or chores), explain that they can do it in the relevant section of the app (Dinner Plan, Chores, etc.) and offer to help with what's currently there.`;
     
     // Call Clawdbot gateway
     const response = await fetch('http://127.0.0.1:18789/v1/chat/completions', {

@@ -13,6 +13,7 @@ import {
   Badge,
   ScrollArea,
   Transition,
+  Tooltip,
 } from '@mantine/core';
 import { 
   IconSend, 
@@ -24,9 +25,35 @@ import {
   IconSun,
   IconMoon,
   IconSunrise,
+  IconMicrophone,
+  IconPlayerStop,
+  IconVolume,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import * as api from '../api';
+
+// TypeScript declarations for Web Speech API
+interface SpeechRecognitionEvent {
+  results: { [index: number]: { [index: number]: { transcript: string } } };
+}
+
+interface SpeechRecognitionInstance {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognitionInstance;
+    webkitSpeechRecognition: new () => SpeechRecognitionInstance;
+  }
+}
 
 // Inject CSS animations
 const styleId = 'assistant-animations';
@@ -115,11 +142,97 @@ export default function HomeView() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   const greeting = getGreeting();
   
   // Determine assistant state
   const assistantState = sending ? 'thinking' : isListening ? 'listening' : messages.length > 0 ? 'active' : 'idle';
+
+  // Initialize speech recognition
+  useEffect(() => {
+    const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognitionClass) {
+      const recognition = new SpeechRecognitionClass();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-AU';
+      
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+        setIsListening(false);
+        pendingVoiceRef.current = transcript;
+      };
+      
+      recognition.onerror = () => {
+        setIsListening(false);
+      };
+      
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+      
+      recognitionRef.current = recognition;
+    }
+  }, []);
+
+  // Text-to-speech function
+  const speak = useCallback((text: string) => {
+    if (!voiceEnabled || !('speechSynthesis' in window)) return;
+    
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    // Clean text for speech
+    const cleanText = text
+      .replace(/\*\*/g, '')
+      .replace(/[#*_~`]/g, '')
+      .replace(/:\w+:/g, '')
+      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '');
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    
+    // Try to find a good voice
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(v => v.lang.startsWith('en') && v.name.includes('Google')) 
+      || voices.find(v => v.lang.startsWith('en-AU'))
+      || voices.find(v => v.lang.startsWith('en'));
+    if (preferred) utterance.voice = preferred;
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    window.speechSynthesis.speak(utterance);
+  }, [voiceEnabled]);
+
+  // Track if we should auto-send after voice input
+  const pendingVoiceRef = useRef<string | null>(null);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert('Speech recognition not supported in this browser');
+      return;
+    }
+    
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      setIsListening(true);
+      recognitionRef.current.start();
+    }
+  };
+
+  const stopSpeaking = () => {
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+  };
   const GreetingIcon = greeting.icon;
 
   const loadStats = useCallback(async () => {
@@ -170,13 +283,13 @@ export default function HomeView() {
     }
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || sending) return;
+  const sendMessageWithText = async (text: string) => {
+    if (!text.trim() || sending) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: text.trim(),
       timestamp: new Date(),
     };
 
@@ -193,28 +306,51 @@ export default function HomeView() {
       });
 
       const data = await response.json();
+      const replyText = data.reply || "I'm here to help! Try asking about chores, dinner plans, or stars.";
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.reply || "I'm here to help! Try asking about chores, dinner plans, or stars.",
+        content: replyText,
         timestamp: new Date(),
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      
+      // Speak the response
+      speak(replyText);
     } catch (err) {
       console.error('Failed to send message:', err);
+      const errorMsg = "Sorry, I couldn't process that. Try again in a moment!";
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "Sorry, I couldn't process that. Try again in a moment!",
+        content: errorMsg,
         timestamp: new Date(),
       }]);
+      speak(errorMsg);
     } finally {
       setSending(false);
       inputRef.current?.focus();
     }
   };
+
+  const sendMessage = async () => {
+    await sendMessageWithText(input);
+  };
+  
+  // Handle auto-send from voice input
+  useEffect(() => {
+    if (pendingVoiceRef.current && !sending && !isListening) {
+      const text = pendingVoiceRef.current;
+      pendingVoiceRef.current = null;
+      // Small delay to show the text in input before sending
+      const timer = setTimeout(() => {
+        sendMessageWithText(text);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [sending, isListening]);
 
   if (loading) {
     return (
@@ -575,25 +711,55 @@ export default function HomeView() {
         {/* Chat Input */}
         <Box p="lg" style={{ borderTop: '2px solid #e9ecef', background: 'white' }}>
           <Group gap="sm">
+            {/* Voice toggle */}
+            <Tooltip label={voiceEnabled ? 'Voice responses on' : 'Voice responses off'}>
+              <ActionIcon 
+                size={50} 
+                radius="xl" 
+                color={voiceEnabled ? 'violet' : 'gray'}
+                variant="light"
+                onClick={() => {
+                  setVoiceEnabled(!voiceEnabled);
+                  if (isSpeaking) stopSpeaking();
+                }}
+              >
+                <IconVolume size={24} />
+              </ActionIcon>
+            </Tooltip>
+            
+            {/* Microphone button */}
+            <Tooltip label={isListening ? 'Listening... (tap to stop)' : 'Tap to speak'}>
+              <ActionIcon 
+                size={50} 
+                radius="xl" 
+                color={isListening ? 'red' : 'violet'}
+                variant={isListening ? 'filled' : 'light'}
+                onClick={toggleListening}
+                disabled={sending}
+                className={isListening ? 'status-bounce' : undefined}
+              >
+                {isListening ? <IconPlayerStop size={24} /> : <IconMicrophone size={24} />}
+              </ActionIcon>
+            </Tooltip>
+            
             <TextInput
               ref={inputRef}
-              placeholder="Type a message..."
+              placeholder={isListening ? "Listening..." : "Type or tap mic to speak..."}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-              disabled={sending}
+              disabled={sending || isListening}
               size="lg"
               radius="xl"
               style={{ flex: 1 }}
               styles={{
                 input: {
-                  border: '2px solid #e9ecef',
-                  '&:focus': {
-                    borderColor: '#7c3aed',
-                  },
+                  border: isListening ? '2px solid #ef4444' : '2px solid #e9ecef',
+                  background: isListening ? '#fef2f2' : 'white',
                 },
               }}
             />
+            
             <ActionIcon 
               size={50} 
               radius="xl" 
@@ -605,6 +771,17 @@ export default function HomeView() {
               <IconSend size={24} />
             </ActionIcon>
           </Group>
+          
+          {/* Speaking indicator */}
+          {isSpeaking && (
+            <Group gap="xs" mt="sm" justify="center">
+              <Box className="status-bounce" style={{ width: 8, height: 8, borderRadius: '50%', background: '#7c3aed' }} />
+              <Text size="sm" c="violet">Speaking...</Text>
+              <ActionIcon size="sm" variant="subtle" color="violet" onClick={stopSpeaking}>
+                <IconPlayerStop size={14} />
+              </ActionIcon>
+            </Group>
+          )}
         </Box>
       </Paper>
     </Box>
