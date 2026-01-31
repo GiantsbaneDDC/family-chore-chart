@@ -930,6 +930,21 @@ app.post('/api/extra-tasks/claims/:claimId/toggle', async (req, res) => {
   }
 });
 
+// Get all members with star counts (for leaderboard) - must be before :memberId route
+app.get('/api/stars/leaderboard', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, name, avatar, color, total_stars
+      FROM family_members
+      ORDER BY total_stars DESC, name
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching star leaderboard:', err);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
 // Get star history for a member
 app.get('/api/stars/:memberId', async (req, res) => {
   try {
@@ -951,21 +966,6 @@ app.get('/api/stars/:memberId', async (req, res) => {
   } catch (err) {
     console.error('Error fetching star history:', err);
     res.status(500).json({ error: 'Failed to fetch star history' });
-  }
-});
-
-// Get all members with star counts (for admin)
-app.get('/api/stars/leaderboard', async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT id, name, avatar, color, total_stars
-      FROM family_members
-      ORDER BY total_stars DESC, name
-    `);
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Error fetching star leaderboard:', err);
-    res.status(500).json({ error: 'Failed to fetch leaderboard' });
   }
 });
 
