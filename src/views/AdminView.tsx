@@ -558,11 +558,6 @@ export default function AdminView() {
                   </div>
                   <div>
                     <Text fw={700} size="lg">{chore.title}</Text>
-                    <Group gap="xs">
-                      <Badge color="yellow" size="sm" variant="light">
-                        ⭐ {chore.points} point{chore.points !== 1 ? 's' : ''}
-                      </Badge>
-                    </Group>
                   </div>
                 </Group>
                 <Group gap="xs">
@@ -954,17 +949,6 @@ export default function AdminView() {
               ))}
             </div>
           </div>
-
-          <NumberInput
-            label="Points"
-            description="Award points for completing this chore"
-            value={choreForm.points}
-            onChange={(value) => setChoreForm({ ...choreForm, points: typeof value === 'number' ? value : 1 })}
-            min={1}
-            max={10}
-            size="md"
-            radius="md"
-          />
 
           <Group justify="flex-end" mt="md" gap="sm">
             <Button variant="subtle" onClick={closeChoreModal} radius="xl">
