@@ -90,7 +90,7 @@ export const getAnalyticsSummary = (weekStart?: string) =>
   api.get('/analytics/summary', { params: { week_start: weekStart } }).then(r => r.data);
 
 // Achievements
-import type { Achievement, MemberAchievement, RewardsData } from './types';
+import type { Achievement, MemberAchievement, RewardsData, Recipe, DinnerPlanData } from './types';
 export const getAchievements = () => api.get<Achievement[]>('/achievements').then(r => r.data);
 export const getMemberAchievements = (memberId: number) => 
   api.get<MemberAchievement[]>(`/achievements/member/${memberId}`).then(r => r.data);
@@ -100,3 +100,22 @@ export const checkAchievements = (memberId: number) =>
 // Rewards
 export const getRewardsData = (weekStart?: string) => 
   api.get<RewardsData>('/rewards', { params: { week_start: weekStart } }).then(r => r.data);
+
+// Recipes
+export const getRecipes = () => api.get<Recipe[]>('/recipes').then(r => r.data);
+export const getRecipe = (id: number) => api.get<Recipe>(`/recipes/${id}`).then(r => r.data);
+export const createRecipe = (data: Partial<Recipe>) => 
+  api.post<Recipe>('/recipes', data).then(r => r.data);
+export const updateRecipe = (id: number, data: Partial<Recipe>) => 
+  api.put<Recipe>(`/recipes/${id}`, data).then(r => r.data);
+export const deleteRecipe = (id: number) => api.delete(`/recipes/${id}`);
+
+// Dinner Plan
+export const getDinnerPlan = (weekStart?: string) => 
+  api.get<DinnerPlanData>('/dinner-plan', { params: { week_start: weekStart } }).then(r => r.data);
+export const setDinnerPlan = (data: { recipe_id: number; day_of_week: number; week_start?: string; notes?: string }) => 
+  api.post('/dinner-plan', data).then(r => r.data);
+export const clearDinnerPlan = (dayOfWeek: number, weekStart?: string) => 
+  api.delete(`/dinner-plan/${dayOfWeek}`, { params: { week_start: weekStart } });
+export const copyLastWeekPlan = () => 
+  api.post<{ success: boolean; copied: number }>('/dinner-plan/copy-week').then(r => r.data);

@@ -173,3 +173,53 @@ export const EXTRA_TASK_ICONS = [
   '⭐', '🌟', '✨', '💫', '🎯', '🏆', '🎖️', '🥇',
   '🎁', '🎀', '💎', '👑', '🚀', '💪', '🙌', '🎉'
 ];
+
+// Dinner Plan & Recipes
+export interface Recipe {
+  id: number;
+  title: string;
+  icon: string;
+  description?: string;
+  prep_time?: number;
+  cook_time?: number;
+  servings?: number;
+  ingredients: string[];
+  instructions: string[];
+  tags: string[];
+  created_at: string;
+}
+
+export interface DinnerPlan {
+  id: number;
+  recipe_id: number;
+  day_of_week: number;
+  week_start: string;
+  notes?: string;
+  created_at: string;
+  // Joined fields
+  recipe_title?: string;
+  recipe_icon?: string;
+  recipe_description?: string;
+  recipe_prep_time?: number;
+  recipe_cook_time?: number;
+}
+
+export interface DinnerPlanData {
+  plans: DinnerPlan[];
+  recipes: Recipe[];
+  weekStart: string;
+}
+
+// Recipe icons
+export const RECIPE_ICONS = [
+  '🍝', '🍕', '🍔', '🌮', '🍜', '🍛', '🍲', '🥘',
+  '🍗', '🥩', '🍖', '🐟', '🦐', '🥗', '🥙', '🌯',
+  '🍱', '🍣', '🥡', '🍚', '🍤', '🧆', '🥧', '🍳'
+];
+
+// Recipe tags
+export const RECIPE_TAGS = [
+  'Quick', 'Healthy', 'Vegetarian', 'Vegan', 'Kid-Friendly',
+  'Comfort Food', 'Spicy', 'Italian', 'Asian', 'Mexican',
+  'BBQ', 'Seafood', 'Pasta', 'Soup', 'Salad', 'One-Pot'
+];

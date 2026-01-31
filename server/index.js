@@ -1530,6 +1530,223 @@ app.get('/api/rewards', async (req, res) => {
   }
 });
 
+// ================== DINNER PLAN & RECIPES API ==================
+
+// Get all recipes
+app.get('/api/recipes', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, title, icon, description, prep_time, cook_time, servings, 
+             ingredients, instructions, tags, created_at
+      FROM recipes 
+      ORDER BY title
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching recipes:', err);
+    res.status(500).json({ error: 'Failed to fetch recipes' });
+  }
+});
+
+// Get single recipe
+app.get('/api/recipes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'SELECT * FROM recipes WHERE id = $1',
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error fetching recipe:', err);
+    res.status(500).json({ error: 'Failed to fetch recipe' });
+  }
+});
+
+// Create recipe
+app.post('/api/recipes', async (req, res) => {
+  try {
+    const { title, icon, description, prep_time, cook_time, servings, ingredients, instructions, tags } = req.body;
+    if (!title) {
+      return res.status(400).json({ error: 'Title required' });
+    }
+    const result = await pool.query(
+      `INSERT INTO recipes (title, icon, description, prep_time, cook_time, servings, ingredients, instructions, tags) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [
+        title, 
+        icon || '🍽️', 
+        description || null,
+        prep_time || null,
+        cook_time || null,
+        servings || 4,
+        JSON.stringify(ingredients || []),
+        JSON.stringify(instructions || []),
+        JSON.stringify(tags || [])
+      ]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error creating recipe:', err);
+    res.status(500).json({ error: 'Failed to create recipe' });
+  }
+});
+
+// Update recipe
+app.put('/api/recipes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, icon, description, prep_time, cook_time, servings, ingredients, instructions, tags } = req.body;
+    const result = await pool.query(
+      `UPDATE recipes SET 
+        title = $1, icon = $2, description = $3, prep_time = $4, cook_time = $5, 
+        servings = $6, ingredients = $7, instructions = $8, tags = $9
+       WHERE id = $10 RETURNING *`,
+      [
+        title, 
+        icon, 
+        description,
+        prep_time,
+        cook_time,
+        servings,
+        JSON.stringify(ingredients || []),
+        JSON.stringify(instructions || []),
+        JSON.stringify(tags || []),
+        id
+      ]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updating recipe:', err);
+    res.status(500).json({ error: 'Failed to update recipe' });
+  }
+});
+
+// Delete recipe
+app.delete('/api/recipes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM recipes WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting recipe:', err);
+    res.status(500).json({ error: 'Failed to delete recipe' });
+  }
+});
+
+// Get dinner plan for a week
+app.get('/api/dinner-plan', async (req, res) => {
+  try {
+    const weekStart = req.query.week_start || getWeekStart();
+    
+    const [plans, recipes] = await Promise.all([
+      pool.query(`
+        SELECT 
+          dp.id, dp.recipe_id, dp.day_of_week, dp.week_start, dp.notes, dp.created_at,
+          r.title as recipe_title, r.icon as recipe_icon, r.description as recipe_description,
+          r.prep_time as recipe_prep_time, r.cook_time as recipe_cook_time
+        FROM dinner_plans dp
+        JOIN recipes r ON dp.recipe_id = r.id
+        WHERE dp.week_start = $1
+        ORDER BY dp.day_of_week
+      `, [weekStart]),
+      pool.query('SELECT * FROM recipes ORDER BY title')
+    ]);
+    
+    res.json({
+      plans: plans.rows,
+      recipes: recipes.rows,
+      weekStart
+    });
+  } catch (err) {
+    console.error('Error fetching dinner plan:', err);
+    res.status(500).json({ error: 'Failed to fetch dinner plan' });
+  }
+});
+
+// Set dinner plan for a specific day
+app.post('/api/dinner-plan', async (req, res) => {
+  try {
+    const { recipe_id, day_of_week, week_start, notes } = req.body;
+    const ws = week_start || getWeekStart();
+    
+    if (day_of_week === undefined || day_of_week < 0 || day_of_week > 6) {
+      return res.status(400).json({ error: 'Valid day_of_week (0-6) required' });
+    }
+    
+    // Upsert - update if exists, insert if not
+    const result = await pool.query(`
+      INSERT INTO dinner_plans (recipe_id, day_of_week, week_start, notes)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (day_of_week, week_start) 
+      DO UPDATE SET recipe_id = $1, notes = $4
+      RETURNING *
+    `, [recipe_id, day_of_week, ws, notes || null]);
+    
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error setting dinner plan:', err);
+    res.status(500).json({ error: 'Failed to set dinner plan' });
+  }
+});
+
+// Clear dinner plan for a specific day
+app.delete('/api/dinner-plan/:dayOfWeek', async (req, res) => {
+  try {
+    const { dayOfWeek } = req.params;
+    const weekStart = req.query.week_start || getWeekStart();
+    
+    await pool.query(
+      'DELETE FROM dinner_plans WHERE day_of_week = $1 AND week_start = $2',
+      [dayOfWeek, weekStart]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error clearing dinner plan:', err);
+    res.status(500).json({ error: 'Failed to clear dinner plan' });
+  }
+});
+
+// Copy last week's dinner plan to current week
+app.post('/api/dinner-plan/copy-week', async (req, res) => {
+  try {
+    const currentWeekStart = getWeekStart();
+    const lastWeekStart = new Date(currentWeekStart);
+    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+    const lastWeekStr = lastWeekStart.toISOString().split('T')[0];
+    
+    // Get last week's plans
+    const lastWeek = await pool.query(
+      'SELECT recipe_id, day_of_week, notes FROM dinner_plans WHERE week_start = $1',
+      [lastWeekStr]
+    );
+    
+    if (lastWeek.rows.length === 0) {
+      return res.status(404).json({ error: 'No dinner plans found for last week' });
+    }
+    
+    // Insert into current week (ignore conflicts)
+    for (const plan of lastWeek.rows) {
+      await pool.query(`
+        INSERT INTO dinner_plans (recipe_id, day_of_week, week_start, notes)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (day_of_week, week_start) DO NOTHING
+      `, [plan.recipe_id, plan.day_of_week, currentWeekStart, plan.notes]);
+    }
+    
+    res.json({ success: true, copied: lastWeek.rows.length });
+  } catch (err) {
+    console.error('Error copying dinner plan:', err);
+    res.status(500).json({ error: 'Failed to copy dinner plan' });
+  }
+});
+
 // ================== STATIC FILES ==================
 
 // Serve static files from dist
