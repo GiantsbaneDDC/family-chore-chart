@@ -450,8 +450,6 @@ export default function AdminView() {
           />
           
           {verifying && <Loader size="sm" mt="lg" />}
-          
-          <Text size="xs" c="dimmed" mt="xl">Default PIN: 1234</Text>
         </div>
       </div>
     );
