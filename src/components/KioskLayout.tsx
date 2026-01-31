@@ -6,7 +6,9 @@ import {
   IconTrophy, 
   IconSettings,
   IconRefresh,
-  IconToolsKitchen2
+  IconToolsKitchen2,
+  IconChecklist,
+  IconRobot
 } from '@tabler/icons-react';
 
 interface NavItem {
@@ -17,7 +19,8 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { to: '/', icon: IconHome, label: 'Chores', color: 'blue' },
+  { to: '/', icon: IconRobot, label: 'Home', color: 'violet' },
+  { to: '/chores', icon: IconChecklist, label: 'Chores', color: 'blue' },
   { to: '/dinner', icon: IconToolsKitchen2, label: 'Dinner Plan', color: 'red' },
   { to: '/rewards', icon: IconTrophy, label: 'Rewards', color: 'yellow' },
   { to: '/admin', icon: IconSettings, label: 'Settings', color: 'gray' },

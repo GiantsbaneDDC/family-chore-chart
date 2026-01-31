@@ -1747,6 +1747,156 @@ app.post('/api/dinner-plan/copy-week', async (req, res) => {
   }
 });
 
+// ================== CHAT API (Family Assistant) ==================
+
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+    const msg = (message || '').toLowerCase();
+    
+    // Get current data for context
+    const weekStart = getWeekStart();
+    const today = new Date().toISOString().split('T')[0];
+    const todayDow = new Date().getDay();
+    
+    let reply = '';
+    
+    // Check for different types of questions
+    if (msg.includes('star') || msg.includes('leader') || msg.includes('point') || msg.includes('who') && msg.includes('most')) {
+      const result = await pool.query(`
+        SELECT name, avatar, total_stars 
+        FROM family_members 
+        ORDER BY total_stars DESC
+      `);
+      
+      if (result.rows.length === 0) {
+        reply = "No one has earned any stars yet! Complete bonus tasks to start earning. ⭐";
+      } else {
+        const leader = result.rows[0];
+        const others = result.rows.slice(1);
+        reply = `🏆 ${leader.avatar} ${leader.name} is in the lead with ${leader.total_stars || 0} stars!\n\n`;
+        if (others.length > 0) {
+          reply += "Standings:\n";
+          result.rows.forEach((m, i) => {
+            const medals = ['🥇', '🥈', '🥉'];
+            reply += `${medals[i] || '  '} ${m.avatar} ${m.name}: ${m.total_stars || 0} stars\n`;
+          });
+        }
+      }
+    }
+    else if (msg.includes('dinner') || msg.includes('eat') || msg.includes('meal') || msg.includes('food') || msg.includes('tonight')) {
+      const result = await pool.query(`
+        SELECT r.title, r.icon, r.description, r.prep_time, r.cook_time
+        FROM dinner_plans dp
+        JOIN recipes r ON dp.recipe_id = r.id
+        WHERE dp.week_start = $1 AND dp.day_of_week = $2
+      `, [weekStart, todayDow]);
+      
+      if (result.rows.length === 0) {
+        reply = "🍽️ No dinner is planned for tonight yet! Head to the Dinner Plan section to pick something delicious.";
+      } else {
+        const dinner = result.rows[0];
+        reply = `${dinner.icon} Tonight's dinner is **${dinner.title}**!\n\n`;
+        if (dinner.description) reply += `${dinner.description}\n\n`;
+        if (dinner.prep_time || dinner.cook_time) {
+          reply += `⏱️ `;
+          if (dinner.prep_time) reply += `${dinner.prep_time} min prep`;
+          if (dinner.prep_time && dinner.cook_time) reply += ` + `;
+          if (dinner.cook_time) reply += `${dinner.cook_time} min cook`;
+        }
+      }
+    }
+    else if (msg.includes('chore') || msg.includes('task') || msg.includes('done') || msg.includes('complete') || msg.includes('how') && (msg.includes('going') || msg.includes('doing'))) {
+      const result = await pool.query(`
+        SELECT 
+          m.name, m.avatar,
+          COUNT(a.id) as total,
+          COUNT(c.id) as done
+        FROM family_members m
+        LEFT JOIN assignments a ON m.id = a.member_id AND a.day_of_week = $1
+        LEFT JOIN completions c ON a.id = c.assignment_id AND c.week_start = $2
+        GROUP BY m.id, m.name, m.avatar
+        ORDER BY m.name
+      `, [todayDow, weekStart]);
+      
+      const totalAll = result.rows.reduce((sum, r) => sum + parseInt(r.total), 0);
+      const doneAll = result.rows.reduce((sum, r) => sum + parseInt(r.done), 0);
+      
+      if (totalAll === 0) {
+        reply = "📋 No chores are scheduled for today!";
+      } else {
+        const pct = Math.round((doneAll / totalAll) * 100);
+        reply = `📋 Today's chores: **${doneAll}/${totalAll}** complete (${pct}%)\n\n`;
+        
+        result.rows.forEach(m => {
+          if (parseInt(m.total) > 0) {
+            const done = parseInt(m.done) === parseInt(m.total);
+            reply += `${m.avatar} ${m.name}: ${m.done}/${m.total} ${done ? '✅' : ''}\n`;
+          }
+        });
+        
+        if (doneAll === totalAll) {
+          reply += "\n🎉 Amazing! All chores are done for today!";
+        }
+      }
+    }
+    else if (msg.includes('week') && (msg.includes('dinner') || msg.includes('meal') || msg.includes('plan'))) {
+      const result = await pool.query(`
+        SELECT dp.day_of_week, r.title, r.icon
+        FROM dinner_plans dp
+        JOIN recipes r ON dp.recipe_id = r.id
+        WHERE dp.week_start = $1
+        ORDER BY dp.day_of_week
+      `, [weekStart]);
+      
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      reply = "🗓️ This week's dinner plan:\n\n";
+      
+      days.forEach((day, i) => {
+        const plan = result.rows.find(r => r.day_of_week === i);
+        if (plan) {
+          reply += `${plan.icon} **${day}**: ${plan.title}\n`;
+        } else {
+          reply += `❓ **${day}**: Not planned\n`;
+        }
+      });
+    }
+    else if (msg.includes('hello') || msg.includes('hi') || msg.includes('hey') || msg.includes('good morning') || msg.includes('good afternoon') || msg.includes('good evening')) {
+      const greetings = [
+        "Hello! 👋 I'm your Family Assistant. How can I help you today?",
+        "Hey there! 😊 Ask me about chores, dinner plans, or star standings!",
+        "Hi! Ready to help the family stay organized! What would you like to know?",
+      ];
+      reply = greetings[Math.floor(Math.random() * greetings.length)];
+    }
+    else if (msg.includes('thank')) {
+      reply = "You're welcome! 😊 Let me know if you need anything else!";
+    }
+    else if (msg.includes('help') || msg.includes('what can you')) {
+      reply = "I can help you with:\n\n";
+      reply += "📋 **Chores** - \"How are the chores going?\"\n";
+      reply += "🍽️ **Dinner** - \"What's for dinner tonight?\"\n";
+      reply += "🗓️ **Meal Planning** - \"What's the dinner plan this week?\"\n";
+      reply += "⭐ **Stars** - \"Who has the most stars?\"\n";
+      reply += "\nJust ask naturally and I'll do my best to help!";
+    }
+    else {
+      // Default response
+      const tips = [
+        "Try asking \"What's for dinner?\" or \"How are the chores going?\" 😊",
+        "I can tell you about stars, chores, or tonight's dinner! Just ask.",
+        "Ask me about the star leaderboard or this week's meal plan!",
+      ];
+      reply = "I'm not sure I understood that. " + tips[Math.floor(Math.random() * tips.length)];
+    }
+    
+    res.json({ reply });
+  } catch (err) {
+    console.error('Error in chat:', err);
+    res.status(500).json({ reply: "Oops! Something went wrong. Try again in a moment!" });
+  }
+});
+
 // ================== STATIC FILES ==================
 
 // Serve static files from dist
