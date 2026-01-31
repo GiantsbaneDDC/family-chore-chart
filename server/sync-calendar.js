@@ -16,16 +16,16 @@ async function syncCalendar() {
   console.log('[Calendar Sync] Starting...');
   
   try {
-    // Fetch next 30 days from Google
+    // Fetch next 365 days from Google
     const today = new Date();
     const endDate = new Date(today);
-    endDate.setDate(endDate.getDate() + 30);
+    endDate.setDate(endDate.getDate() + 365);
     
     const fromStr = today.toISOString().split('T')[0];
     const toStr = endDate.toISOString().split('T')[0];
     
     const { stdout } = await execPromise(
-      `gog calendar events primary --from ${fromStr} --to ${toStr} --json`,
+      `gog calendar events primary --from ${fromStr} --to ${toStr} --max 500 --json`,
       { env: { ...process.env, GOG_ACCOUNT: 'tinyerinandmatt@gmail.com' } }
     );
     
