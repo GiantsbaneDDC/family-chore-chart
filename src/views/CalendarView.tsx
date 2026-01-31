@@ -13,7 +13,7 @@ import {
   ScrollArea,
   SegmentedControl,
 } from '@mantine/core';
-import { IconChevronLeft, IconChevronRight, IconCalendar, IconClock, IconMapPin } from '@tabler/icons-react';
+import { IconChevronLeft, IconChevronRight, IconCalendar } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 
 interface CalendarEvent {
@@ -288,55 +288,6 @@ export default function CalendarView() {
             })}
           </Box>
         </ScrollArea>
-      </Paper>
-
-      {/* Today's Events Detail */}
-      <Paper p="md" radius="xl" shadow="sm">
-        <Title order={5} mb="sm" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <IconClock size={18} />
-          {isCurrentView ? "Today's Schedule" : `${dates[0].format('MMM D')} Schedule`}
-        </Title>
-        
-        {(() => {
-          const todayEvents = getEventsForDate(isCurrentView ? dayjs() : dates[0]);
-          
-          if (todayEvents.length === 0) {
-            return (
-              <Text c="dimmed" size="sm">No events scheduled</Text>
-            );
-          }
-          
-          return (
-            <Stack gap="xs">
-              {todayEvents.map(event => (
-                <Group key={event.id} gap="sm" wrap="nowrap">
-                  <Box
-                    style={{
-                      width: 4,
-                      height: 40,
-                      borderRadius: 2,
-                      background: event.color ? colorMap[event.color] || '#06b6d4' : '#06b6d4',
-                    }}
-                  />
-                  <Box style={{ flex: 1 }}>
-                    <Text fw={600} size="sm">{event.title}</Text>
-                    <Group gap="md">
-                      <Text size="xs" c="dimmed">
-                        {event.allDay ? 'All day' : `${formatTime(event.start)} - ${formatTime(event.end)}`}
-                      </Text>
-                      {event.location && (
-                        <Group gap={4}>
-                          <IconMapPin size={12} color="#6b7280" />
-                          <Text size="xs" c="dimmed" lineClamp={1}>{event.location}</Text>
-                        </Group>
-                      )}
-                    </Group>
-                  </Box>
-                </Group>
-              ))}
-            </Stack>
-          );
-        })()}
       </Paper>
     </Box>
   );
