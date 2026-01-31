@@ -33,8 +33,14 @@ import dayjs from 'dayjs';
 import * as api from '../api';
 
 // TypeScript declarations for Web Speech API
+interface SpeechRecognitionResult {
+  [index: number]: { transcript: string };
+  isFinal: boolean;
+  length: number;
+}
+
 interface SpeechRecognitionEvent {
-  results: { [index: number]: { [index: number]: { transcript: string } } };
+  results: { [index: number]: SpeechRecognitionResult; length: number };
 }
 
 interface SpeechRecognitionInstance {
@@ -44,8 +50,11 @@ interface SpeechRecognitionInstance {
   start: () => void;
   stop: () => void;
   onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: any) => void) | null;
   onend: (() => void) | null;
+  onaudiostart: (() => void) | null;
+  onspeechstart: (() => void) | null;
+  onspeechend: (() => void) | null;
 }
 
 declare global {
@@ -151,28 +160,55 @@ export default function HomeView() {
   // Determine assistant state
   const assistantState = sending ? 'thinking' : isListening ? 'listening' : messages.length > 0 ? 'active' : 'idle';
 
+  const [listenStatus, setListenStatus] = useState('');
+  const [transcript, setTranscript] = useState('');
+  
   // Initialize speech recognition
   useEffect(() => {
     const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognitionClass) {
       const recognition = new SpeechRecognitionClass();
       recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.interimResults = true; // Show interim results
       recognition.lang = 'en-AU';
       
       recognition.onresult = (event: SpeechRecognitionEvent) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(transcript);
-        setIsListening(false);
-        pendingVoiceRef.current = transcript;
+        const result = event.results[event.results.length - 1];
+        const text = result[0].transcript;
+        setTranscript(text);
+        
+        if (result.isFinal) {
+          setInput(text);
+          setIsListening(false);
+          setListenStatus('');
+          pendingVoiceRef.current = text;
+        }
       };
       
-      recognition.onerror = () => {
+      recognition.onerror = (e: any) => {
+        console.error('Speech recognition error:', e);
         setIsListening(false);
+        setListenStatus(`Error: ${e.error || 'unknown'}`);
+        setTranscript('');
       };
       
       recognition.onend = () => {
         setIsListening(false);
+        if (!pendingVoiceRef.current) {
+          setListenStatus('');
+        }
+      };
+      
+      recognition.onaudiostart = () => {
+        setListenStatus('Listening...');
+      };
+      
+      recognition.onspeechstart = () => {
+        setListenStatus('Hearing you...');
+      };
+      
+      recognition.onspeechend = () => {
+        setListenStatus('Processing...');
       };
       
       recognitionRef.current = recognition;
@@ -221,26 +257,29 @@ export default function HomeView() {
                      window.location.hostname === '127.0.0.1';
     
     if (!isSecure) {
-      alert('Voice input requires HTTPS. For now, please type your message or access via localhost.');
+      setListenStatus('Error: Requires HTTPS');
       return;
     }
     
     if (!recognitionRef.current) {
-      alert('Speech recognition not supported in this browser. Try Chrome or Edge.');
+      setListenStatus('Error: Browser not supported');
       return;
     }
     
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
+      setListenStatus('');
     } else {
+      setTranscript('');
+      setListenStatus('Starting...');
       setIsListening(true);
       try {
         recognitionRef.current.start();
-      } catch (err) {
+      } catch (err: any) {
         console.error('Speech recognition error:', err);
         setIsListening(false);
-        alert('Could not start voice input. Please check microphone permissions.');
+        setListenStatus(`Error: ${err.message || 'Could not start'}`);
       }
     }
   };
@@ -319,6 +358,7 @@ export default function HomeView() {
 
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+    setTranscript('');
     setSending(true);
     setShowWelcome(false);
 
@@ -752,47 +792,78 @@ export default function HomeView() {
         <Box p="xl" style={{ borderTop: '2px solid #e9ecef', background: 'white' }}>
           <Center>
             <Stack align="center" gap="md">
+              {/* Live Transcript Display */}
+              {(isListening || transcript) && (
+                <Paper 
+                  p="md" 
+                  radius="lg" 
+                  style={{ 
+                    background: '#f8f9fa', 
+                    minWidth: 300,
+                    minHeight: 60,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text size="xl" fw={500} ta="center" c={transcript ? 'dark' : 'dimmed'}>
+                    {transcript || (isListening ? '...' : '')}
+                  </Text>
+                </Paper>
+              )}
+              
               {/* Main Mic Button */}
               <ActionIcon 
-                size={100} 
+                size={120} 
                 radius="xl" 
-                color={isListening ? 'red' : isSpeaking ? 'green' : 'violet'}
+                color={isListening ? 'red' : isSpeaking ? 'green' : sending ? 'orange' : 'violet'}
                 variant="filled"
-                onClick={isSpeaking ? stopSpeaking : toggleListening}
+                onClick={isSpeaking ? stopSpeaking : sending ? undefined : toggleListening}
                 disabled={sending}
                 className={isListening ? 'status-bounce' : undefined}
                 style={{
                   boxShadow: isListening 
-                    ? '0 0 30px rgba(239, 68, 68, 0.5)' 
+                    ? '0 0 40px rgba(239, 68, 68, 0.6)' 
                     : isSpeaking 
-                      ? '0 0 30px rgba(34, 197, 94, 0.5)'
-                      : '0 0 20px rgba(124, 58, 237, 0.3)',
+                      ? '0 0 40px rgba(34, 197, 94, 0.6)'
+                      : sending
+                        ? '0 0 30px rgba(249, 115, 22, 0.5)'
+                        : '0 0 20px rgba(124, 58, 237, 0.3)',
                   transition: 'all 0.3s',
                 }}
               >
-                {isSpeaking ? (
-                  <IconPlayerStop size={50} />
+                {sending ? (
+                  <Loader size={50} color="white" />
+                ) : isSpeaking ? (
+                  <IconPlayerStop size={60} />
                 ) : isListening ? (
-                  <IconPlayerStop size={50} />
+                  <IconMicrophone size={60} />
                 ) : (
-                  <IconMicrophone size={50} />
+                  <IconMicrophone size={60} />
                 )}
               </ActionIcon>
               
               {/* Status Text */}
               <Text 
-                size="lg" 
-                fw={600} 
-                c={isListening ? 'red' : isSpeaking ? 'green' : 'dimmed'}
+                size="xl" 
+                fw={700} 
+                c={isListening ? 'red' : isSpeaking ? 'green' : sending ? 'orange' : 'dimmed'}
               >
                 {sending 
                   ? '🤔 Thinking...' 
                   : isListening 
-                    ? '🎤 Listening... (tap to stop)' 
+                    ? `🎤 ${listenStatus || 'Tap to stop'}` 
                     : isSpeaking 
                       ? '🔊 Speaking... (tap to stop)'
-                      : 'Tap to speak'}
+                      : '👆 Tap to speak'}
               </Text>
+              
+              {/* Error/Help Text */}
+              {listenStatus.includes('Error') && (
+                <Text size="sm" c="red" ta="center">
+                  {listenStatus}. Make sure you're using HTTPS and allowed mic access.
+                </Text>
+              )}
             </Stack>
           </Center>
         </Box>
