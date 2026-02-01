@@ -162,12 +162,39 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
       .then(data => setEvents(data.events?.slice(0, 3) || []))
       .catch(() => {});
 
-    // Get weather (simplified - you could add a real weather API)
-    const hour = new Date().getHours();
-    setWeather({
-      temp: Math.round(20 + Math.random() * 10),
-      condition: hour >= 6 && hour < 18 ? 'sunny' : 'night',
-    });
+    // Get real weather from Open-Meteo (Ourimbah, NSW)
+    const fetchWeather = async () => {
+      try {
+        const res = await fetch(
+          'https://api.open-meteo.com/v1/forecast?latitude=-33.36&longitude=151.37&current=temperature_2m,weather_code&timezone=Australia%2FSydney'
+        );
+        const data = await res.json();
+        const temp = Math.round(data.current.temperature_2m);
+        const code = data.current.weather_code;
+        
+        // Map weather codes to conditions
+        // https://open-meteo.com/en/docs#weathervariables
+        let condition = 'sunny';
+        const hour = new Date().getHours();
+        if (hour >= 20 || hour < 6) {
+          condition = 'night';
+        } else if (code >= 61 && code <= 67 || code >= 80 && code <= 82) {
+          condition = 'rainy';
+        } else if (code >= 1 && code <= 3 || code >= 45 && code <= 48) {
+          condition = 'cloudy';
+        }
+        
+        setWeather({ temp, condition });
+      } catch {
+        // Fallback to simple display
+        const hour = new Date().getHours();
+        setWeather({
+          temp: 22,
+          condition: hour >= 6 && hour < 18 ? 'sunny' : 'night',
+        });
+      }
+    };
+    fetchWeather();
   }, []);
 
   const getWeatherIcon = () => {
