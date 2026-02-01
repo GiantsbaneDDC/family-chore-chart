@@ -140,61 +140,65 @@ export default function RecipeView() {
           shadow="sm"
           style={{ 
             background: '#fff',
-            overflow: 'auto',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
-          <Group gap="sm" mb="lg">
+          <Group gap="sm" mb="lg" style={{ flexShrink: 0 }}>
             <Text style={{ fontSize: '2.5rem' }}>🥬</Text>
             <Title order={2} c="dark">Ingredients</Title>
           </Group>
           
-          <Stack gap="md">
-            {recipe.ingredients && recipe.ingredients.map((ing, i) => (
-              <Paper 
-                key={i} 
-                p="md" 
-                radius="lg" 
-                style={{ 
-                  background: '#f8f9fa',
-                  border: '2px solid #e9ecef',
-                }}
-              >
-                <Group gap="md">
-                  <Box 
-                    style={{ 
-                      width: 44, 
-                      height: 44, 
-                      borderRadius: '50%', 
-                      background: '#fd7e14',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      fontWeight: 700,
-                      fontSize: '1.3rem',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {i + 1}
-                  </Box>
-                  <Text size="xl" fw={500} style={{ flex: 1 }}>{ing}</Text>
-                </Group>
-              </Paper>
-            ))}
-          </Stack>
+          <ScrollArea style={{ flex: 1 }}>
+            <Stack gap="md" pr="md">
+              {recipe.ingredients && recipe.ingredients.map((ing, i) => (
+                <Paper 
+                  key={i} 
+                  p="md" 
+                  radius="lg" 
+                  style={{ 
+                    background: '#f8f9fa',
+                    border: '2px solid #e9ecef',
+                  }}
+                >
+                  <Group gap="md">
+                    <Box 
+                      style={{ 
+                        width: 44, 
+                        height: 44, 
+                        borderRadius: '50%', 
+                        background: '#fd7e14',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontWeight: 700,
+                        fontSize: '1.3rem',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {i + 1}
+                    </Box>
+                    <Text size="xl" fw={500} style={{ flex: 1 }}>{ing}</Text>
+                  </Group>
+                </Paper>
+              ))}
 
-          {/* Tags at bottom */}
-          {recipe.tags && recipe.tags.length > 0 && (
-            <Box mt="xl" pt="lg" style={{ borderTop: '2px solid #e9ecef' }}>
-              <Group gap="sm">
-                {recipe.tags.map((tag, i) => (
-                  <Badge key={i} size="lg" variant="light" color="orange" style={{ fontSize: '0.95rem' }}>
-                    {tag}
-                  </Badge>
-                ))}
-              </Group>
-            </Box>
-          )}
+              {/* Tags at bottom */}
+              {recipe.tags && recipe.tags.length > 0 && (
+                <Box mt="xl" pt="lg" style={{ borderTop: '2px solid #e9ecef' }}>
+                  <Group gap="sm">
+                    {recipe.tags.map((tag, i) => (
+                      <Badge key={i} size="lg" variant="light" color="orange" style={{ fontSize: '0.95rem' }}>
+                        {tag}
+                      </Badge>
+                    ))}
+                  </Group>
+                </Box>
+              )}
+            </Stack>
+          </ScrollArea>
         </Paper>
 
         {/* Right Column - Instructions */}
