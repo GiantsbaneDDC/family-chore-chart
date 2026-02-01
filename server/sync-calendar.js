@@ -24,8 +24,9 @@ async function syncCalendar() {
     const fromStr = today.toISOString().split('T')[0];
     const toStr = endDate.toISOString().split('T')[0];
     
+    const gogPath = '/home/linuxbrew/.linuxbrew/bin/gog';
     const { stdout } = await execPromise(
-      `gog calendar events primary --from ${fromStr} --to ${toStr} --max 500 --json`,
+      `${gogPath} calendar events primary --from ${fromStr} --to ${toStr} --max 500 --json`,
       { env: { ...process.env, GOG_ACCOUNT: 'tinyerinandmatt@gmail.com' } }
     );
     
