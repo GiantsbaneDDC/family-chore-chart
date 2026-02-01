@@ -36,7 +36,12 @@ export default function RecipeView() {
 
   useEffect(() => {
     if (id) {
-      api.getRecipe(parseInt(id))
+      const recipeId = parseInt(id, 10);
+      if (isNaN(recipeId)) {
+        setLoading(false);
+        return;
+      }
+      api.getRecipe(recipeId)
         .then(setRecipe)
         .catch(err => console.error('Failed to load recipe:', err))
         .finally(() => setLoading(false));

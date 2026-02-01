@@ -46,7 +46,7 @@ export default function App() {
           setFamilyAvatars(members.map((m: any) => m.avatar));
         }
       })
-      .catch(() => {});
+      .catch(err => console.warn('Failed to fetch family avatars:', err));
   }, []);
 
   // Idle detection

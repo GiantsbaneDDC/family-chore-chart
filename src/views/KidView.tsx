@@ -54,11 +54,16 @@ export default function KidView() {
   const loadData = useCallback(async () => {
     if (!memberId) return;
     try {
+      const id = parseInt(memberId, 10);
+      if (isNaN(id)) {
+        navigate('/my');
+        return;
+      }
       const [memberData, assignmentsData, completionsData, streakData, claimsData] = await Promise.all([
-        api.getMember(parseInt(memberId)),
-        api.getMemberAssignments(parseInt(memberId)),
-        api.getMemberCompletions(parseInt(memberId)),
-        api.getMemberStreak(parseInt(memberId)),
+        api.getMember(id),
+        api.getMemberAssignments(id),
+        api.getMemberCompletions(id),
+        api.getMemberStreak(id),
         api.getTodaysClaims(),
       ]);
       setMember(memberData);
@@ -66,7 +71,7 @@ export default function KidView() {
       setCompletions(completionsData);
       setStreak(streakData);
       // Filter claims to only this member
-      setExtraTaskClaims(claimsData.filter(c => c.member_id === parseInt(memberId)));
+      setExtraTaskClaims(claimsData.filter(c => c.member_id === id));
     } catch (err) {
       console.error('Failed to load data:', err);
       navigate('/my');

@@ -192,13 +192,13 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
           setTodayDinner({ title: todayPlan.recipe_title, icon: todayPlan.recipe_icon });
         }
       })
-      .catch(() => {});
+      .catch(err => console.warn('Failed to fetch dinner plan:', err));
 
     // Get today's events
     fetch('/api/calendar/today')
       .then(r => r.json())
       .then(data => setEvents(data.events?.slice(0, 3) || []))
-      .catch(() => {});
+      .catch(err => console.warn('Failed to fetch calendar:', err));
 
     // Get real weather from Open-Meteo (Ourimbah, NSW)
     const fetchWeather = async () => {

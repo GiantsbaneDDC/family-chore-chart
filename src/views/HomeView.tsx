@@ -207,6 +207,17 @@ export default function HomeView() {
       
       recognitionRef.current = recognition;
     }
+    
+    // Cleanup on unmount
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch { /* ignore */ }
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
   }, []);
 
   const loadData = useCallback(async () => {
