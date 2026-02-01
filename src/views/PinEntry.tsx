@@ -17,6 +17,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { IconArrowLeft, IconUser } from '@tabler/icons-react';
 import * as api from '../api';
+import { Avatar } from '../components/Avatar';
 import type { FamilyMember } from '../types';
 
 export default function PinEntry() {
@@ -150,12 +151,12 @@ export default function PinEntry() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 36,
                       border: `3px solid ${member.color}`,
                       flexShrink: 0,
+                      overflow: 'hidden',
                     }}
                   >
-                    {member.avatar}
+                    <Avatar avatar={member.avatar} size={48} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <Text size="xl" fw={800}>{member.name}</Text>
@@ -205,11 +206,11 @@ export default function PinEntry() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: 56,
                   border: `4px solid ${selectedMember.color}`,
+                  overflow: 'hidden',
                 }}
               >
-                {selectedMember.avatar}
+                <Avatar avatar={selectedMember.avatar} size={64} />
               </div>
               
               <div style={{ textAlign: 'center' }}>

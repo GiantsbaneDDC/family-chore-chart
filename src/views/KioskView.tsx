@@ -15,6 +15,7 @@ import { IconSettings, IconCheck, IconStar } from '@tabler/icons-react';
 import confetti from 'canvas-confetti';
 import dayjs from 'dayjs';
 import * as api from '../api';
+import { Avatar } from '../components/Avatar';
 import type { KioskData, Assignment, ExtraTaskClaim } from '../types';
 import { DAYS, SHORT_DAYS } from '../types';
 import { playPop, playSuccess } from '../utils/effects';
@@ -242,7 +243,7 @@ export default function KioskView() {
                 borderLeft: `4px solid ${member.color}`,
               }}
             >
-              <Text style={{ fontSize: '2rem' }}>{member.avatar}</Text>
+              <Avatar avatar={member.avatar} size={40} />
               <Text size="xs" fw={700} c="dark" ta="center" lineClamp={1} style={{ maxWidth: 70 }}>
                 {member.name.split(' ')[0]}
               </Text>

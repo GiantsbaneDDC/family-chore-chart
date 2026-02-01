@@ -40,6 +40,7 @@ import {
 import dayjs from 'dayjs';
 import * as api from '../api';
 import { celebrateCompletion, playSuccess } from '../utils/effects';
+import { Avatar } from '../components/Avatar';
 
 // Inject CSS animations
 const styleId = 'home-animations';
@@ -522,10 +523,10 @@ export default function HomeView() {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              fontSize: '1.5rem',
+                              overflow: 'hidden',
                             }}
                           >
-                            {member.avatar}
+                            <Avatar avatar={member.avatar} size={32} />
                           </Box>
                           <Box>
                             <Text fw={700}>{member.name}</Text>
@@ -632,7 +633,7 @@ export default function HomeView() {
                   const leader = [...data.familyStats].sort((a, b) => b.totalStars - a.totalStars)[0];
                   return leader.totalStars > 0 ? (
                     <Group gap="sm">
-                      <Text style={{ fontSize: '1.8rem' }}>{leader.avatar}</Text>
+                      <Avatar avatar={leader.avatar} size={36} />
                       <Box>
                         <Text fw={700}>{leader.name}</Text>
                         <Badge color="yellow" variant="light">⭐ {leader.totalStars}</Badge>

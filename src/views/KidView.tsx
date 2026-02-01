@@ -15,6 +15,7 @@ import { IconArrowLeft, IconCheck, IconStar } from '@tabler/icons-react';
 import confetti from 'canvas-confetti';
 import dayjs from 'dayjs';
 import * as api from '../api';
+import { Avatar } from '../components/Avatar';
 import type { FamilyMember, Assignment, Completion, StreakData, ExtraTaskClaim } from '../types';
 import { DAYS, SHORT_DAYS } from '../types';
 
@@ -192,7 +193,7 @@ export default function KidView() {
           >
             <IconArrowLeft size={20} />
           </ActionIcon>
-          <Text style={{ fontSize: '2.5rem' }}>{member.avatar}</Text>
+          <Avatar avatar={member.avatar} size={48} />
           <Title order={2} c="white" fw={800}>{member.name}'s Chores</Title>
         </Box>
 

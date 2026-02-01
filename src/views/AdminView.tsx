@@ -45,7 +45,8 @@ import {
 import dayjs from 'dayjs';
 import * as api from '../api';
 import type { FamilyMember, Chore, Assignment, ExtraTask, Recipe } from '../types';
-import { DAYS, SHORT_DAYS, MEMBER_COLORS, CHORE_ICONS, AVATAR_EMOJIS, EXTRA_TASK_ICONS, RECIPE_ICONS } from '../types';
+import { DAYS, SHORT_DAYS, MEMBER_COLORS, CHORE_ICONS, AVATAR_EMOJIS, FLUENT_AVATARS, EXTRA_TASK_ICONS, RECIPE_ICONS } from '../types';
+import { Avatar } from '../components/Avatar';
 
 export default function AdminView() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -540,11 +541,11 @@ export default function AdminView() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 28,
-                      border: `3px solid ${member.color}`
+                      border: `3px solid ${member.color}`,
+                      overflow: 'hidden',
                     }}
                   >
-                    {member.avatar}
+                    <Avatar avatar={member.avatar} size={40} />
                   </div>
                   <div>
                     <Text fw={700} size="lg">{member.name}</Text>
@@ -723,7 +724,7 @@ export default function AdminView() {
                             )}
                             <td style={{ textAlign: 'left' }}>
                               <Group gap="xs" wrap="nowrap">
-                                <Text>{member.avatar}</Text>
+                                <Avatar avatar={member.avatar} size={24} />
                                 <Text size="sm" fw={500}>{member.name}</Text>
                               </Group>
                             </td>
@@ -761,7 +762,7 @@ export default function AdminView() {
                       {members.map(member => (
                         <div key={member.id} style={{ padding: 12, borderBottom: '1px solid #e2e8f0' }}>
                           <Group gap="sm" mb="sm">
-                            <Text>{member.avatar}</Text>
+                            <Avatar avatar={member.avatar} size={24} />
                             <Text fw={600} size="sm">{member.name}</Text>
                           </Group>
                           <div className="mobile-assignment-grid">
@@ -1096,7 +1097,7 @@ export default function AdminView() {
           />
 
           <div>
-            <Text size="sm" fw={600} mb="sm">Avatar</Text>
+            <Text size="sm" fw={600} mb="xs">Avatar - Emoji</Text>
             <div className="emoji-grid">
               {AVATAR_EMOJIS.map(emoji => (
                 <button
@@ -1106,6 +1107,26 @@ export default function AdminView() {
                   onClick={() => setMemberForm({ ...memberForm, avatar: emoji })}
                 >
                   {emoji}
+                </button>
+              ))}
+            </div>
+            
+            <Text size="sm" fw={600} mt="md" mb="xs">Avatar - Fluent 3D</Text>
+            <div className="emoji-grid">
+              {FLUENT_AVATARS.map(fluent => (
+                <button
+                  key={fluent.id}
+                  type="button"
+                  className={`emoji-btn ${memberForm.avatar === fluent.url ? 'selected' : ''}`}
+                  onClick={() => setMemberForm({ ...memberForm, avatar: fluent.url })}
+                  title={fluent.label}
+                  style={{ padding: 4 }}
+                >
+                  <img 
+                    src={fluent.url} 
+                    alt={fluent.label}
+                    style={{ width: 28, height: 28, objectFit: 'contain' }}
+                  />
                 </button>
               ))}
             </div>

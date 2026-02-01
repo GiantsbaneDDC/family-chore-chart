@@ -115,6 +115,27 @@ export const AVATAR_EMOJIS = [
   '👵', '🦸', '🦹', '🧙', '🧚', '🐶', '🐱', '🦊'
 ];
 
+// Fluent animated emoji avatars (Microsoft Fluent Emoji)
+// These have subtle animations like blinking eyes
+export const FLUENT_AVATARS = [
+  { id: 'boy', label: 'Boy', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Boy%203D.png' },
+  { id: 'girl', label: 'Girl', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Girl%203D.png' },
+  { id: 'man', label: 'Man', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Man%203D.png' },
+  { id: 'woman', label: 'Woman', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Woman%203D.png' },
+  { id: 'child', label: 'Child', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Child%203D.png' },
+  { id: 'baby', label: 'Baby', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Baby%203D.png' },
+  { id: 'person', label: 'Person', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Person%203D.png' },
+  { id: 'older-man', label: 'Older Man', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Old%20Man%203D.png' },
+  { id: 'older-woman', label: 'Older Woman', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Old%20Woman%203D.png' },
+  { id: 'superhero', label: 'Superhero', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Superhero%203D.png' },
+  { id: 'supervillain', label: 'Supervillain', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Supervillain%203D.png' },
+  { id: 'mage', label: 'Mage', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Mage%203D.png' },
+  { id: 'fairy', label: 'Fairy', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Fairy%203D.png' },
+  { id: 'dog', label: 'Dog', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Dog%20Face%203D.png' },
+  { id: 'cat', label: 'Cat', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Cat%20Face%203D.png' },
+  { id: 'fox', label: 'Fox', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Fox%203D.png' },
+];
+
 // Achievements
 export interface Achievement {
   id: number;

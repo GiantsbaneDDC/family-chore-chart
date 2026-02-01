@@ -15,6 +15,7 @@ import {
 } from '@mantine/core';
 import { IconStar, IconTrophy } from '@tabler/icons-react';
 import * as api from '../api';
+import { Avatar } from '../components/Avatar';
 import type { ExtraTask, FamilyMember, StarHistory } from '../types';
 
 export default function RewardsView() {
@@ -239,10 +240,10 @@ export default function RewardsView() {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontSize: '1.8rem',
+                                overflow: 'hidden',
                               }}
                             >
-                              {member.avatar}
+                              <Avatar avatar={member.avatar} size={36} />
                             </Box>
                             
                             {/* Name */}
@@ -342,7 +343,7 @@ export default function RewardsView() {
                     opacity: claiming ? 0.6 : 1,
                   }}
                 >
-                  <Text style={{ fontSize: '2.5rem' }}>{member.avatar}</Text>
+                  <Avatar avatar={member.avatar} size={48} />
                   <Text fw={700} ta="center">{member.name}</Text>
                 </Paper>
               ))}
