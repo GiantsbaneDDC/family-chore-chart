@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Text, Title, Group, Stack, Paper } from '@mantine/core';
+import { Avatar } from './Avatar';
 import { 
   IconSunFilled, 
   IconCloudFilled, 
@@ -498,11 +499,10 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
               className="idle-bounce"
               style={{
                 animationDelay: `${i * 0.2}s`,
-                fontSize: '3rem',
                 filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))',
               }}
             >
-              {avatar}
+              <Avatar avatar={avatar} size={64} />
             </Box>
           ))}
         </Group>

@@ -25,15 +25,39 @@ async function syncCalendar() {
     const toStr = endDate.toISOString().split('T')[0];
     
     const gogPath = '/home/linuxbrew/.linuxbrew/bin/gog';
-    const { stdout } = await execPromise(
-      `${gogPath} calendar events primary --from ${fromStr} --to ${toStr} --max 500 --json`,
-      { env: { ...process.env, GOG_ACCOUNT: 'tinyerinandmatt@gmail.com' } }
+    const gogEnv = { ...process.env, GOG_ACCOUNT: 'tinyerinandmatt@gmail.com' };
+    
+    // Get all calendars dynamically
+    const { stdout: calListOut } = await execPromise(
+      `${gogPath} calendar calendars --json`,
+      { env: gogEnv }
     );
+    const calendarData = JSON.parse(calListOut);
+    const calendars = (calendarData.calendars || []).map(c => ({ id: c.id, name: c.summary }));
     
-    const data = JSON.parse(stdout);
-    const events = data.events || [];
+    console.log(`[Calendar Sync] Found ${calendars.length} calendars`);
     
-    console.log(`[Calendar Sync] Fetched ${events.length} events`);
+    let allEvents = [];
+    
+    for (const calendar of calendars) {
+      try {
+        const { stdout } = await execPromise(
+          `${gogPath} calendar events "${calendar.id}" --from ${fromStr} --to ${toStr} --max 500 --json`,
+          { env: gogEnv }
+        );
+        const data = JSON.parse(stdout);
+        const events = data.events || [];
+        if (events.length > 0) {
+          console.log(`[Calendar Sync] Fetched ${events.length} events from "${calendar.name}"`);
+        }
+        allEvents = allEvents.concat(events);
+      } catch (err) {
+        console.error(`[Calendar Sync] Warning: Failed to fetch from "${calendar.name}":`, err.message);
+      }
+    }
+    
+    const events = allEvents;
+    console.log(`[Calendar Sync] Total: ${events.length} events`);
     
     // Clear old events and insert new ones
     await pool.query('DELETE FROM calendar_events WHERE end_time < NOW() - INTERVAL \'1 day\'');
