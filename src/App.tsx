@@ -9,6 +9,7 @@ import RewardsView from './views/RewardsView';
 import DinnerPlanView from './views/DinnerPlanView';
 import RecipeView from './views/RecipeView';
 import CalendarView from './views/CalendarView';
+import WeatherView from './views/WeatherView';
 import { KioskLayout } from './components/KioskLayout';
 import { IdleScreen } from './components/IdleScreen';
 
@@ -27,6 +28,7 @@ function AppRoutes() {
       <Route path="/dinner" element={<DinnerPlanView />} />
       <Route path="/recipe/:id" element={<RecipeView />} />
       <Route path="/calendar" element={<CalendarView />} />
+      <Route path="/weather" element={<WeatherView />} />
     </Routes>
   );
 }
