@@ -141,7 +141,23 @@ Visit **http://localhost:8080**
 
 ## 🖼️ Screenshots
 
-*Coming soon*
+### Home
+![Home](screenshots/home.png)
+
+### Chores
+![Chores](screenshots/chores.png)
+
+### Weather
+![Weather](screenshots/weather.png)
+
+### Dinner Planning
+![Dinner Plan](screenshots/dinner.png)
+
+### Rewards & Leaderboard
+![Rewards](screenshots/rewards.png)
+
+### Calendar
+![Calendar](screenshots/calendar.png)
 
 ## 📁 Project Structure
 
