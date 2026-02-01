@@ -115,25 +115,24 @@ export const AVATAR_EMOJIS = [
   '👵', '🦸', '🦹', '🧙', '🧚', '🐶', '🐱', '🦊'
 ];
 
-// Fluent animated emoji avatars (Microsoft Fluent Emoji)
-// These have subtle animations like blinking eyes
+// Fluent 3D emoji avatars (Microsoft Fluent Emoji)
 export const FLUENT_AVATARS = [
-  { id: 'boy', label: 'Boy', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Boy%203D.png' },
-  { id: 'girl', label: 'Girl', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Girl%203D.png' },
-  { id: 'man', label: 'Man', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Man%203D.png' },
-  { id: 'woman', label: 'Woman', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Woman%203D.png' },
-  { id: 'child', label: 'Child', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Child%203D.png' },
-  { id: 'baby', label: 'Baby', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Baby%203D.png' },
-  { id: 'person', label: 'Person', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Person%203D.png' },
-  { id: 'older-man', label: 'Older Man', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Old%20Man%203D.png' },
-  { id: 'older-woman', label: 'Older Woman', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Old%20Woman%203D.png' },
-  { id: 'superhero', label: 'Superhero', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Superhero%203D.png' },
-  { id: 'supervillain', label: 'Supervillain', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Supervillain%203D.png' },
-  { id: 'mage', label: 'Mage', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Mage%203D.png' },
-  { id: 'fairy', label: 'Fairy', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Fairy%203D.png' },
-  { id: 'dog', label: 'Dog', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Dog%20Face%203D.png' },
-  { id: 'cat', label: 'Cat', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Cat%20Face%203D.png' },
-  { id: 'fox', label: 'Fox', url: 'https://raw.githubusercontent.com/AltarBeastiful/fluent-emoji/refs/heads/main/3D/Fox%203D.png' },
+  { id: 'boy', label: 'Boy', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Boy/Default/3D/boy_3d_default.png' },
+  { id: 'girl', label: 'Girl', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Girl/Default/3D/girl_3d_default.png' },
+  { id: 'man', label: 'Man', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Man/Default/3D/man_3d_default.png' },
+  { id: 'woman', label: 'Woman', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Woman/Default/3D/woman_3d_default.png' },
+  { id: 'child', label: 'Child', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Child/Default/3D/child_3d_default.png' },
+  { id: 'baby', label: 'Baby', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Baby/Default/3D/baby_3d_default.png' },
+  { id: 'person', label: 'Person', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Person/Default/3D/person_3d_default.png' },
+  { id: 'older', label: 'Older Person', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Older%20person/Default/3D/older_person_3d_default.png' },
+  { id: 'superhero', label: 'Superhero', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Man%20superhero/Default/3D/man_superhero_3d_default.png' },
+  { id: 'supervillain', label: 'Supervillain', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Man%20supervillain/Default/3D/man_supervillain_3d_default.png' },
+  { id: 'mage', label: 'Mage', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Man%20mage/Default/3D/man_mage_3d_default.png' },
+  { id: 'fairy', label: 'Fairy', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Person%20fairy/Default/3D/person_fairy_3d_default.png' },
+  { id: 'ninja', label: 'Ninja', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Ninja/Default/3D/ninja_3d_default.png' },
+  { id: 'dog', label: 'Dog', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Dog%20face/3D/dog_face_3d.png' },
+  { id: 'cat', label: 'Cat', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Cat%20face/3D/cat_face_3d.png' },
+  { id: 'fox', label: 'Fox', url: 'https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Fox/3D/fox_3d.png' },
 ];
 
 // Achievements
