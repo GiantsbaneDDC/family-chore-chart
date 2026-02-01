@@ -1580,6 +1580,19 @@ app.get('/api/recipes', async (req, res) => {
   }
 });
 
+// Get existing recipe source URLs (for duplicate checking) - MUST be before :id route!
+app.get('/api/recipes/source-urls', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT source_url FROM recipes WHERE source_url IS NOT NULL'
+    );
+    res.json({ urls: result.rows.map(r => r.source_url) });
+  } catch (err) {
+    console.error('Error fetching source URLs:', err);
+    res.status(500).json({ error: 'Failed to fetch source URLs' });
+  }
+});
+
 // Get single recipe
 app.get('/api/recipes/:id', async (req, res) => {
   try {
@@ -1673,19 +1686,6 @@ app.delete('/api/recipes/:id', async (req, res) => {
   }
 });
 
-// Get existing recipe source URLs (for duplicate checking)
-app.get('/api/recipes/source-urls', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT source_url FROM recipes WHERE source_url IS NOT NULL'
-    );
-    res.json({ urls: result.rows.map(r => r.source_url) });
-  } catch (err) {
-    console.error('Error fetching source URLs:', err);
-    res.status(500).json({ error: 'Failed to fetch source URLs' });
-  }
-});
-
 // Search for recipes on the web (uses AI with web search)
 app.post('/api/recipes/search', async (req, res) => {
   try {
@@ -1695,7 +1695,13 @@ app.post('/api/recipes/search', async (req, res) => {
     }
     
     // Use Clawdbot agent to search the web
-    const searchPrompt = `Search the web for "${query} recipe". Find 6-8 good recipe results from popular cooking sites.
+    // Detect if user mentioned a specific site
+    const siteMatch = query.match(/\b(taste\.com\.au|delicious\.com\.au|allrecipes|bbcgoodfood|recipetineats|budgetbytes|seriouseats|foodnetwork)\b/i);
+    const siteHint = siteMatch ? ` Prioritize results from ${siteMatch[1]}.` : '';
+    
+    const searchPrompt = `Search the web for "${query} recipe".${siteHint} Find 6-8 good recipe results.
+
+If the query mentions a specific website (like taste.com.au), make sure to include results from that site first.
 
 Return ONLY a valid JSON array with this exact format, nothing else before or after:
 [
@@ -1745,9 +1751,21 @@ app.post('/api/recipes/import', async (req, res) => {
       return res.status(400).json({ error: 'URL required' });
     }
     
-    // Fetch the page content
+    // Fetch the page content with realistic browser headers
     const pageRes = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChoreChartBot/1.0)' }
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0',
+      }
     });
     
     if (!pageRes.ok) {
