@@ -86,21 +86,41 @@ export default function CalendarView() {
 
   const getEventsForDate = (date: dayjs.Dayjs) => {
     const dateStr = date.format('YYYY-MM-DD');
-    return events.filter(event => {
-      // Parse event times and convert to local date strings for comparison
-      const eventStartLocal = dayjs(event.start).format('YYYY-MM-DD');
-      const eventEndLocal = dayjs(event.end).format('YYYY-MM-DD');
-      
-      if (event.allDay) {
-        // All-day events: check if date falls within range (end date is exclusive)
-        return dateStr >= eventStartLocal && dateStr < eventEndLocal;
-      }
-      return eventStartLocal === dateStr;
-    });
+    return events
+      .filter(event => {
+        // Parse event times and convert to local date strings for comparison
+        const eventStartLocal = dayjs(event.start).format('YYYY-MM-DD');
+        const eventEndLocal = dayjs(event.end).format('YYYY-MM-DD');
+        
+        if (event.allDay) {
+          // All-day events: check if date falls within range (end date is exclusive)
+          return dateStr >= eventStartLocal && dateStr < eventEndLocal;
+        }
+        return eventStartLocal === dateStr;
+      })
+      // Sort by all-day first, then by start time
+      .sort((a, b) => {
+        if (a.allDay && !b.allDay) return -1;
+        if (!a.allDay && b.allDay) return 1;
+        return dayjs(a.start).valueOf() - dayjs(b.start).valueOf();
+      });
   };
 
   const formatTime = (dateStr: string) => {
     return dayjs(dateStr).format('h:mm A');
+  };
+
+  const formatTimeRange = (start: string, end: string) => {
+    const startTime = dayjs(start);
+    const endTime = dayjs(end);
+    const durationHours = endTime.diff(startTime, 'hour', true);
+    
+    // For short events (< 2 hours), just show start time
+    if (durationHours < 2) {
+      return startTime.format('h:mm A');
+    }
+    // For longer events, show range
+    return `${startTime.format('h:mm')}-${endTime.format('h:mm A')}`;
   };
 
   const isToday = (date: dayjs.Dayjs) => date.isSame(dayjs(), 'day');
@@ -277,14 +297,14 @@ export default function CalendarView() {
                               : '0 1px 3px rgba(0,0,0,0.08)',
                           }}
                         >
+                          {!event.allDay && (
+                            <Text size="xs" c="cyan.7" fw={600} style={{ fontSize: compact ? 9 : 11 }}>
+                              {compact ? dayjs(event.start).format('h:mma') : formatTimeRange(event.start, event.end)}
+                            </Text>
+                          )}
                           <Text size="xs" fw={600} lineClamp={1} style={{ fontSize: compact ? 11 : 12 }}>
                             {event.title}
                           </Text>
-                          {!event.allDay && !compact && (
-                            <Text size="xs" c="dimmed">
-                              {formatTime(event.start)}
-                            </Text>
-                          )}
                         </Box>
                       ))
                     )}
