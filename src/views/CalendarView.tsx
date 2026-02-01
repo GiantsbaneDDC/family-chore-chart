@@ -89,19 +89,31 @@ export default function CalendarView() {
     return events
       .filter(event => {
         // Parse event times and convert to local date strings for comparison
-        const eventStartLocal = dayjs(event.start).format('YYYY-MM-DD');
-        const eventEndLocal = dayjs(event.end).format('YYYY-MM-DD');
+        const eventStart = dayjs(event.start);
+        const eventEnd = dayjs(event.end);
+        const eventStartLocal = eventStart.format('YYYY-MM-DD');
+        const eventEndLocal = eventEnd.format('YYYY-MM-DD');
         
-        if (event.allDay) {
-          // All-day events: check if date falls within range (end date is exclusive)
-          return dateStr >= eventStartLocal && dateStr < eventEndLocal;
+        // Check if this is a multi-day event (spans more than one calendar day)
+        const isMultiDay = eventStartLocal !== eventEndLocal;
+        
+        if (event.allDay || isMultiDay) {
+          // Multi-day events: check if date falls within range
+          // For allDay, end is exclusive; for timed events, include the end date
+          if (event.allDay) {
+            return dateStr >= eventStartLocal && dateStr < eventEndLocal;
+          }
+          return dateStr >= eventStartLocal && dateStr <= eventEndLocal;
         }
+        // Single-day timed event
         return eventStartLocal === dateStr;
       })
-      // Sort by all-day first, then by start time
+      // Sort by all-day/multi-day first, then by start time
       .sort((a, b) => {
-        if (a.allDay && !b.allDay) return -1;
-        if (!a.allDay && b.allDay) return 1;
+        const aMulti = a.allDay || dayjs(a.start).format('YYYY-MM-DD') !== dayjs(a.end).format('YYYY-MM-DD');
+        const bMulti = b.allDay || dayjs(b.start).format('YYYY-MM-DD') !== dayjs(b.end).format('YYYY-MM-DD');
+        if (aMulti && !bMulti) return -1;
+        if (!aMulti && bMulti) return 1;
         return dayjs(a.start).valueOf() - dayjs(b.start).valueOf();
       });
   };
@@ -284,29 +296,45 @@ export default function CalendarView() {
                         </Text>
                       )
                     ) : (
-                      dayEvents.slice(0, compact ? 3 : 4).map(event => (
-                        <Box
-                          key={event.id}
-                          p={compact ? 4 : 6}
-                          style={{
-                            background: today ? '#ffffff' : '#f8fafc',
-                            borderRadius: compact ? 6 : 8,
-                            borderLeft: `3px solid ${event.color ? colorMap[event.color] || '#06b6d4' : '#06b6d4'}`,
-                            boxShadow: today 
-                              ? '0 2px 6px rgba(0,0,0,0.15)' 
-                              : '0 1px 3px rgba(0,0,0,0.08)',
-                          }}
-                        >
-                          {!event.allDay && (
-                            <Text size="xs" c="cyan.7" fw={600} style={{ fontSize: compact ? 9 : 11 }}>
-                              {compact ? dayjs(event.start).format('h:mma') : formatTimeRange(event.start, event.end)}
+                      dayEvents.slice(0, compact ? 3 : 4).map(event => {
+                        const eventStart = dayjs(event.start);
+                        const eventEnd = dayjs(event.end);
+                        const isMultiDay = eventStart.format('YYYY-MM-DD') !== eventEnd.format('YYYY-MM-DD');
+                        const isStartDay = date.format('YYYY-MM-DD') === eventStart.format('YYYY-MM-DD');
+                        const isEndDay = date.format('YYYY-MM-DD') === eventEnd.format('YYYY-MM-DD');
+                        
+                        return (
+                          <Box
+                            key={event.id}
+                            p={compact ? 4 : 6}
+                            style={{
+                              background: (event.allDay || isMultiDay) 
+                                ? (event.color ? `${colorMap[event.color] || '#06b6d4'}15` : '#ecfeff')
+                                : (today ? '#ffffff' : '#f8fafc'),
+                              borderRadius: compact ? 6 : 8,
+                              borderLeft: `3px solid ${event.color ? colorMap[event.color] || '#06b6d4' : '#06b6d4'}`,
+                              boxShadow: today 
+                                ? '0 2px 6px rgba(0,0,0,0.15)' 
+                                : '0 1px 3px rgba(0,0,0,0.08)',
+                            }}
+                          >
+                            {!event.allDay && !isMultiDay && (
+                              <Text size="xs" c="cyan.7" fw={600} style={{ fontSize: compact ? 9 : 11 }}>
+                                {compact ? dayjs(event.start).format('h:mma') : formatTimeRange(event.start, event.end)}
+                              </Text>
+                            )}
+                            {isMultiDay && !event.allDay && (
+                              <Text size="xs" c="cyan.7" fw={600} style={{ fontSize: compact ? 9 : 11 }}>
+                                {isStartDay ? `Starts ${eventStart.format('h:mma')}` : 
+                                 isEndDay ? `Ends ${eventEnd.format('h:mma')}` : 'All day'}
+                              </Text>
+                            )}
+                            <Text size="xs" fw={600} lineClamp={1} style={{ fontSize: compact ? 11 : 12 }}>
+                              {event.title}
                             </Text>
-                          )}
-                          <Text size="xs" fw={600} lineClamp={1} style={{ fontSize: compact ? 11 : 12 }}>
-                            {event.title}
-                          </Text>
-                        </Box>
-                      ))
+                          </Box>
+                        );
+                      })
                     )}
                     {dayEvents.length > (compact ? 3 : 4) && (
                       <Text size="xs" c="dimmed" ta="center" style={{ fontSize: 10 }}>
