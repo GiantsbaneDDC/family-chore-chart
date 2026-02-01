@@ -129,6 +129,10 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
   const [forecast, setForecast] = useState<ForecastDay[]>([]);
   const [todayDinner, setTodayDinner] = useState<{ title: string; icon: string } | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  
+  // Pixel shift to prevent screen burn-in
+  const [pixelShift, setPixelShift] = useState({ x: 0, y: 0 });
+  
   const [floatingEmojis] = useState<FloatingEmoji[]>(() => {
     const emojis = ['⭐', '🌟', '✨', '💫', '🎯', '🏆', '🎉', '🌈', '🚀', '💪', '🎮', '📚'];
     return Array.from({ length: 15 }, (_, i) => ({
@@ -154,6 +158,25 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
   // Update time every second
   useEffect(() => {
     const interval = setInterval(() => setTime(dayjs()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Pixel shift to prevent burn-in - slowly drifts content around
+  useEffect(() => {
+    const SHIFT_RANGE = 30; // Max pixels to shift in any direction
+    const SHIFT_INTERVAL = 30000; // Change position every 30 seconds
+    
+    const updateShift = () => {
+      setPixelShift({
+        x: Math.round((Math.random() - 0.5) * 2 * SHIFT_RANGE),
+        y: Math.round((Math.random() - 0.5) * 2 * SHIFT_RANGE),
+      });
+    };
+    
+    // Initial random position
+    updateShift();
+    
+    const interval = setInterval(updateShift, SHIFT_INTERVAL);
     return () => clearInterval(interval);
   }, []);
 
@@ -312,7 +335,7 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
         </Text>
       ))}
 
-      {/* Main Content */}
+      {/* Main Content - with pixel shift for burn-in prevention */}
       <Box
         style={{
           position: 'absolute',
@@ -322,6 +345,8 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
           alignItems: 'center',
           justifyContent: 'center',
           padding: 40,
+          transform: `translate(${pixelShift.x}px, ${pixelShift.y}px)`,
+          transition: 'transform 3s ease-in-out',
         }}
       >
         {/* Animated Robot Mascot */}
