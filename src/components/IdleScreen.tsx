@@ -1,7 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Text, Title, Group, Stack, Paper } from '@mantine/core';
-import { IconSun, IconCloud, IconCloudRain, IconMoon } from '@tabler/icons-react';
+import { 
+  IconSunFilled, 
+  IconCloudFilled, 
+  IconCloudRain, 
+  IconMoonFilled,
+  IconSnowflake,
+  IconCloudStorm,
+} from '@tabler/icons-react';
 import dayjs from 'dayjs';
+
+interface ForecastDay {
+  day: string;
+  high: number;
+  low: number;
+  code: number;
+}
 
 // Inject animations
 const styleId = 'idle-screen-animations';
@@ -111,7 +125,8 @@ interface IdleScreenProps {
 
 export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '👩'] }: IdleScreenProps) {
   const [time, setTime] = useState(dayjs());
-  const [weather, setWeather] = useState<{ temp: number; condition: string } | null>(null);
+  const [weather, setWeather] = useState<{ temp: number; condition: string; high: number; low: number } | null>(null);
+  const [forecast, setForecast] = useState<ForecastDay[]>([]);
   const [todayDinner, setTodayDinner] = useState<{ title: string; icon: string } | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [floatingEmojis] = useState<FloatingEmoji[]>(() => {
@@ -166,46 +181,80 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
     const fetchWeather = async () => {
       try {
         const res = await fetch(
-          'https://api.open-meteo.com/v1/forecast?latitude=-33.36&longitude=151.37&current=temperature_2m,weather_code&timezone=Australia%2FSydney'
+          'https://api.open-meteo.com/v1/forecast?latitude=-33.36&longitude=151.37&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Australia%2FSydney&forecast_days=5'
         );
         const data = await res.json();
         const temp = Math.round(data.current.temperature_2m);
         const code = data.current.weather_code;
+        const todayHigh = Math.round(data.daily.temperature_2m_max[0]);
+        const todayLow = Math.round(data.daily.temperature_2m_min[0]);
         
         // Map weather codes to conditions
-        // https://open-meteo.com/en/docs#weathervariables
-        let condition = 'sunny';
-        const hour = new Date().getHours();
-        if (hour >= 20 || hour < 6) {
-          condition = 'night';
-        } else if (code >= 61 && code <= 67 || code >= 80 && code <= 82) {
-          condition = 'rainy';
-        } else if (code >= 1 && code <= 3 || code >= 45 && code <= 48) {
-          condition = 'cloudy';
-        }
+        const getCondition = (weatherCode: number, isNightTime = false) => {
+          if (isNightTime) return 'night';
+          if (weatherCode >= 95) return 'storm';
+          if (weatherCode >= 71 && weatherCode <= 77) return 'snow';
+          if (weatherCode >= 61 && weatherCode <= 67 || weatherCode >= 80 && weatherCode <= 82) return 'rainy';
+          if (weatherCode >= 1 && weatherCode <= 3 || weatherCode >= 45 && weatherCode <= 48) return 'cloudy';
+          return 'sunny';
+        };
         
-        setWeather({ temp, condition });
+        const hour = new Date().getHours();
+        const isNightTime = hour >= 20 || hour < 6;
+        
+        setWeather({ 
+          temp, 
+          condition: getCondition(code, isNightTime),
+          high: todayHigh,
+          low: todayLow,
+        });
+        
+        // Build forecast for next 4 days
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const forecastDays: ForecastDay[] = [];
+        for (let i = 1; i < 5; i++) {
+          const date = dayjs().add(i, 'day');
+          forecastDays.push({
+            day: days[date.day()],
+            high: Math.round(data.daily.temperature_2m_max[i]),
+            low: Math.round(data.daily.temperature_2m_min[i]),
+            code: data.daily.weather_code[i],
+          });
+        }
+        setForecast(forecastDays);
       } catch {
         // Fallback to simple display
         const hour = new Date().getHours();
         setWeather({
           temp: 22,
           condition: hour >= 6 && hour < 18 ? 'sunny' : 'night',
+          high: 25,
+          low: 18,
         });
       }
     };
     fetchWeather();
   }, []);
 
-  const getWeatherIcon = () => {
-    if (!weather) return <IconSun size={32} />;
-    switch (weather.condition) {
-      case 'sunny': return <IconSun size={32} color="#fbbf24" />;
-      case 'cloudy': return <IconCloud size={32} color="#94a3b8" />;
-      case 'rainy': return <IconCloudRain size={32} color="#60a5fa" />;
-      case 'night': return <IconMoon size={32} color="#a78bfa" />;
-      default: return <IconSun size={32} />;
+  const getWeatherIcon = (condition?: string, size = 32) => {
+    const cond = condition || weather?.condition || 'sunny';
+    switch (cond) {
+      case 'sunny': return <IconSunFilled size={size} color="#fbbf24" />;
+      case 'cloudy': return <IconCloudFilled size={size} color="#94a3b8" />;
+      case 'rainy': return <IconCloudRain size={size} color="#60a5fa" />;
+      case 'storm': return <IconCloudStorm size={size} color="#6366f1" />;
+      case 'snow': return <IconSnowflake size={size} color="#e0f2fe" />;
+      case 'night': return <IconMoonFilled size={size} color="#a78bfa" />;
+      default: return <IconSunFilled size={size} color="#fbbf24" />;
     }
+  };
+
+  const getConditionFromCode = (code: number) => {
+    if (code >= 95) return 'storm';
+    if (code >= 71 && code <= 77) return 'snow';
+    if (code >= 61 && code <= 67 || code >= 80 && code <= 82) return 'rainy';
+    if (code >= 1 && code <= 3 || code >= 45 && code <= 48) return 'cloudy';
+    return 'sunny';
   };
 
   const isNight = time.hour() >= 20 || time.hour() < 6;
@@ -346,9 +395,27 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
                 border: '1px solid rgba(255,255,255,0.2)',
               }}
             >
-              <Group gap="sm">
-                {getWeatherIcon()}
-                <Text c="white" size="xl" fw={700}>{weather.temp}°C</Text>
+              <Group gap="md">
+                <Group gap="sm">
+                  {getWeatherIcon()}
+                  <Box>
+                    <Text c="white" size="xl" fw={700}>{weather.temp}°</Text>
+                    <Text c="white" size="xs" style={{ opacity: 0.8 }}>
+                      H:{weather.high}° L:{weather.low}°
+                    </Text>
+                  </Box>
+                </Group>
+                {forecast.length > 0 && (
+                  <Group gap="md" ml="md" pl="md" style={{ borderLeft: '1px solid rgba(255,255,255,0.3)' }}>
+                    {forecast.map((day) => (
+                      <Box key={day.day} ta="center">
+                        <Text c="white" size="xs" fw={600} style={{ opacity: 0.8 }}>{day.day}</Text>
+                        {getWeatherIcon(getConditionFromCode(day.code), 20)}
+                        <Text c="white" size="xs" fw={600}>{day.high}°</Text>
+                      </Box>
+                    ))}
+                  </Group>
+                )}
               </Group>
             </Paper>
           )}
