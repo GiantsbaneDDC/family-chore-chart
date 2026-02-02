@@ -37,13 +37,30 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD || 'chorechart',
 });
 
-// Utility: Get start of current week (Sunday)
+// Utility: Get current date in Sydney timezone as YYYY-MM-DD
+function getSydneyDate(date = new Date()) {
+  return date.toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+}
+
+// Utility: Get start of current week (Sunday) in Sydney timezone
 function getWeekStart(date = new Date()) {
-  const d = new Date(date);
-  const day = d.getDay();
-  d.setDate(d.getDate() - day);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString().split('T')[0];
+  // Get the current date parts in Sydney timezone
+  const sydneyStr = date.toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+  const [year, month, day] = sydneyStr.split('-').map(Number);
+  const sydneyDate = new Date(year, month - 1, day);
+  
+  // Find Sunday
+  const dayOfWeek = sydneyDate.getDay();
+  sydneyDate.setDate(sydneyDate.getDate() - dayOfWeek);
+  
+  return sydneyDate.toISOString().split('T')[0];
+}
+
+// Utility: Get current day of week (0=Sunday, 6=Saturday) in Sydney timezone
+function getSydneyDayOfWeek(date = new Date()) {
+  const sydneyStr = date.toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+  const [year, month, day] = sydneyStr.split('-').map(Number);
+  return new Date(year, month - 1, day).getDay();
 }
 
 // ================== FAMILY MEMBERS API ==================
@@ -852,7 +869,7 @@ app.delete('/api/extra-tasks/:id', async (req, res) => {
 // Get available extra tasks (not claimed today)
 app.get('/api/extra-tasks/available', async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getSydneyDate();
     const result = await pool.query(`
       SELECT et.id, et.title, et.icon, et.stars, et.created_at
       FROM extra_tasks et
@@ -874,7 +891,7 @@ app.post('/api/extra-tasks/:id/claim', async (req, res) => {
   try {
     const { id } = req.params;
     const { member_id } = req.body;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getSydneyDate();
     
     // Check if already claimed today
     const existing = await pool.query(
@@ -901,7 +918,7 @@ app.post('/api/extra-tasks/:id/claim', async (req, res) => {
 // Get claimed extra tasks for today (with member info)
 app.get('/api/extra-tasks/claims/today', async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getSydneyDate();
     const result = await pool.query(`
       SELECT 
         etc.id as claim_id, etc.extra_task_id, etc.member_id, etc.claimed_date, etc.completed_at,
@@ -1007,7 +1024,7 @@ app.get('/api/stars/:memberId', async (req, res) => {
 app.get('/api/kiosk', async (req, res) => {
   try {
     const weekStart = req.query.week_start || getWeekStart();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getSydneyDate();
     
     const [members, assignments, completions, extraTaskClaims] = await Promise.all([
       pool.query('SELECT id, name, color, avatar, total_stars FROM family_members ORDER BY created_at'),
@@ -1993,7 +2010,7 @@ app.get('/api/assistant/family', async (req, res) => {
 app.get('/api/assistant/chores/today', async (req, res) => {
   try {
     const weekStart = getWeekStart();
-    const todayDow = new Date().getDay();
+    const todayDow = getSydneyDayOfWeek();
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     
     const result = await pool.query(`
@@ -2130,7 +2147,7 @@ app.post('/api/assistant/complete', async (req, res) => {
   try {
     const { chore, member } = req.body;
     const weekStart = getWeekStart();
-    const todayDow = new Date().getDay();
+    const todayDow = getSydneyDayOfWeek();
     
     const choreResult = await pool.query('SELECT id, title, points FROM chores WHERE LOWER(title) LIKE $1', [`%${chore.toLowerCase()}%`]);
     if (choreResult.rows.length === 0) return res.status(404).json({ error: `No chore matching "${chore}"` });
@@ -2330,7 +2347,7 @@ const assistantActions = {
       return { success: false, error: 'Need chore name and member name' };
     }
     const weekStart = getWeekStart();
-    const todayDow = new Date().getDay();
+    const todayDow = getSydneyDayOfWeek();
     
     const chore = await pool.query('SELECT id, title, points FROM chores WHERE LOWER(title) LIKE $1', [`%${chore_name.toLowerCase()}%`]);
     if (chore.rows.length === 0) return { success: false, error: `No chore found matching "${chore_name}"` };
@@ -2494,7 +2511,7 @@ app.post('/api/chat', async (req, res) => {
     
     // Get current family data for context
     const weekStart = getWeekStart();
-    const todayDow = new Date().getDay();
+    const todayDow = getSydneyDayOfWeek();
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     
     // Calculate next week start
@@ -2662,7 +2679,7 @@ GUIDELINES:
           .trim();
         
         // Use sag for TTS with Charlie voice
-        await execPromise(`sag -o "${audioFile}" -v IKne3meq5aSn9XLyUdCD "${cleanText.replace(/"/g, '\\"')}"`, {
+        await execPromise(`/home/linuxbrew/.linuxbrew/bin/sag -o "${audioFile}" -v IKne3meq5aSn9XLyUdCD "${cleanText.replace(/"/g, '\\"')}"`, {
           env: { ...process.env, ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY || '' }
         });
         
@@ -2716,7 +2733,7 @@ app.post('/api/chat/v2', async (req, res) => {
   try {
     const { message, voice = true, history = [] } = req.body;
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const today = days[new Date().getDay()];
+    const today = days[getSydneyDayOfWeek()];
     
     // Minimal context - just what's needed
     const context = `You are the Family Hub assistant on a kitchen tablet. Today is ${today}.
@@ -2795,7 +2812,7 @@ If you need data, use an action first. After action results, give a friendly res
       try {
         const audioFile = `/tmp/assistant-${Date.now()}.mp3`;
         const cleanText = reply.replace(/\*\*/g, '').replace(/[#*_~`]/g, '').replace(/\n+/g, ' ').replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim();
-        await execPromise(`sag -o "${audioFile}" -v IKne3meq5aSn9XLyUdCD "${cleanText.replace(/"/g, '\\"')}"`, {
+        await execPromise(`/home/linuxbrew/.linuxbrew/bin/sag -o "${audioFile}" -v IKne3meq5aSn9XLyUdCD "${cleanText.replace(/"/g, '\\"')}"`, {
           env: { ...process.env, ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY || '' }
         });
         audioUrl = `/audio/${path.basename(audioFile)}`;
