@@ -2927,6 +2927,55 @@ app.get('/api/activities', async (req, res) => {
   }
 });
 
+// Create activity
+app.post('/api/activities', async (req, res) => {
+  try {
+    const { name, icon, points, category } = req.body;
+    const result = await pool.query(
+      `INSERT INTO activities (name, icon, points, category)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [name, icon || '🏃', points || 5, category || 'general']
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error creating activity:', err);
+    res.status(500).json({ error: 'Failed to create activity' });
+  }
+});
+
+// Update activity
+app.put('/api/activities/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, icon, points, category } = req.body;
+    const result = await pool.query(
+      `UPDATE activities SET name = $1, icon = $2, points = $3, category = $4
+       WHERE id = $5 RETURNING *`,
+      [name, icon, points, category, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Activity not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updating activity:', err);
+    res.status(500).json({ error: 'Failed to update activity' });
+  }
+});
+
+// Delete activity
+app.delete('/api/activities/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM activities WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting activity:', err);
+    res.status(500).json({ error: 'Failed to delete activity' });
+  }
+});
+
 // Log an activity
 app.post('/api/activity-logs', async (req, res) => {
   try {
