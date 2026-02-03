@@ -8,8 +8,6 @@ import {
   Group,
   Button,
   Badge,
-  Progress,
-  Avatar,
   Stack,
   SimpleGrid,
   Modal,
@@ -20,11 +18,12 @@ import {
   Paper,
   RingProgress,
   ThemeIcon,
-  Divider,
+  Box,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconPlus, IconFlame, IconTrophy, IconTrash, IconActivity } from '@tabler/icons-react';
+import { Avatar } from '../components/Avatar';
 
 interface Activity {
   id: number;
@@ -245,9 +244,7 @@ export default function FitnessView() {
               {weeklyStats?.members.map((member, index) => (
                 <Group key={member.id} justify="space-between">
                   <Group gap="sm">
-                    <Avatar color={member.color} radius="xl" size="sm">
-                      {member.avatar}
-                    </Avatar>
+                    <Avatar avatar={member.avatar} size={28} />
                     <Text size="sm">{member.name}</Text>
                   </Group>
                   <Group gap="xs">
@@ -271,9 +268,7 @@ export default function FitnessView() {
               {streaks.length > 0 ? streaks.map(streak => (
                 <Group key={streak.member_id} justify="space-between">
                   <Group gap="sm">
-                    <Avatar color={streak.color} radius="xl" size="sm">
-                      {streak.avatar}
-                    </Avatar>
+                    <Avatar avatar={streak.avatar || '👤'} size={28} />
                     <Text size="sm">{streak.name}</Text>
                   </Group>
                   <Group gap="xs">
