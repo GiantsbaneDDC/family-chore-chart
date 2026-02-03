@@ -344,10 +344,19 @@ export default function FitnessView() {
           <Select
             label="Who did the activity?"
             placeholder="Select family member"
-            data={members.map(m => ({ value: m.id.toString(), label: `${m.avatar} ${m.name}` }))}
+            data={members.map(m => ({ value: m.id.toString(), label: m.name }))}
             value={selectedMember}
             onChange={setSelectedMember}
             size="md"
+            renderOption={({ option }) => {
+              const member = members.find(m => m.id.toString() === option.value);
+              return (
+                <Group gap="sm">
+                  {member && <Avatar avatar={member.avatar} size={24} />}
+                  <Text size="sm">{option.label}</Text>
+                </Group>
+              );
+            }}
           />
           
           <Select
