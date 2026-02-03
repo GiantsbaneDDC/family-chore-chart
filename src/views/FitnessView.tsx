@@ -11,18 +11,17 @@ import {
   Stack,
   SimpleGrid,
   Modal,
-  Select,
-  NumberInput,
-  Textarea,
   ActionIcon,
   Paper,
   RingProgress,
   ThemeIcon,
   Box,
+  Center,
+  CloseButton,
+  ScrollArea,
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconPlus, IconFlame, IconTrophy, IconTrash, IconActivity } from '@tabler/icons-react';
+import { IconPlus, IconFlame, IconTrophy, IconTrash, IconActivity, IconArrowLeft } from '@tabler/icons-react';
 import { Avatar } from '../components/Avatar';
 
 interface Activity {
@@ -85,13 +84,10 @@ export default function FitnessView() {
   const [members, setMembers] = useState<Member[]>([]);
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats | null>(null);
   const [streaks, setStreaks] = useState<Streak[]>([]);
-  const [opened, { open, close }] = useDisclosure(false);
   
-  // Form state
-  const [selectedMember, setSelectedMember] = useState<string | null>(null);
-  const [selectedActivity, setSelectedActivity] = useState<string | null>(null);
-  const [duration, setDuration] = useState<number | ''>('');
-  const [notes, setNotes] = useState('');
+  // POS picker state
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 
   const fetchData = async () => {
     try {
@@ -117,40 +113,28 @@ export default function FitnessView() {
     fetchData();
   }, []);
 
-  const handleLogActivity = async () => {
-    if (!selectedMember || !selectedActivity) {
-      notifications.show({
-        title: 'Missing Info',
-        message: 'Please select a family member and activity',
-        color: 'red',
-      });
-      return;
-    }
+  const handleLogActivity = async (activityId: number) => {
+    if (!selectedMember) return;
 
     try {
       const res = await fetch('/api/activity-logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          member_id: parseInt(selectedMember),
-          activity_id: parseInt(selectedActivity),
-          duration_mins: duration || null,
-          notes: notes || null,
+          member_id: selectedMember.id,
+          activity_id: activityId,
         }),
       });
 
       if (res.ok) {
-        const activity = activities.find(a => a.id === parseInt(selectedActivity));
+        const activity = activities.find(a => a.id === activityId);
         notifications.show({
           title: '🎉 Activity Logged!',
-          message: `${activity?.icon} ${activity?.name} - Great job staying active!`,
+          message: `${activity?.icon} ${activity?.name} - Great job ${selectedMember.name}!`,
           color: 'green',
         });
-        close();
+        setPickerOpen(false);
         setSelectedMember(null);
-        setSelectedActivity(null);
-        setDuration('');
-        setNotes('');
         fetchData();
       }
     } catch (err) {
@@ -179,7 +163,12 @@ export default function FitnessView() {
     return acc;
   }, {} as Record<string, Activity[]>);
 
-  const weeklyGoal = 30; // activities per week
+  const categoryOrder = ['cardio', 'sports', 'strength', 'flexibility', 'play', 'general'];
+  const sortedCategories = Object.keys(groupedActivities).sort((a, b) => {
+    return categoryOrder.indexOf(a) - categoryOrder.indexOf(b);
+  });
+
+  const weeklyGoal = 30;
   const progress = weeklyStats ? (weeklyStats.total_activities / weeklyGoal) * 100 : 0;
 
   return (
@@ -199,7 +188,7 @@ export default function FitnessView() {
           size="lg"
           variant="gradient"
           gradient={{ from: 'teal', to: 'green' }}
-          onClick={open}
+          onClick={() => setPickerOpen(true)}
         >
           Log Activity
         </Button>
@@ -241,7 +230,7 @@ export default function FitnessView() {
               <Text fw={500} size="lg">This Week</Text>
             </Group>
             <Stack gap="sm">
-              {weeklyStats?.members.map((member, index) => (
+              {weeklyStats?.members.map((member) => (
                 <Group key={member.id} justify="space-between">
                   <Group gap="sm">
                     <Avatar avatar={member.avatar} size={28} />
@@ -338,69 +327,150 @@ export default function FitnessView() {
         </Grid.Col>
       </Grid>
 
-      {/* Log Activity Modal */}
-      <Modal opened={opened} onClose={close} title="Log Activity" size="md" centered>
-        <Stack>
-          <Select
-            label="Who did the activity?"
-            placeholder="Select family member"
-            data={members.map(m => ({ value: m.id.toString(), label: m.name }))}
-            value={selectedMember}
-            onChange={setSelectedMember}
-            size="md"
-            renderOption={({ option }) => {
-              const member = members.find(m => m.id.toString() === option.value);
-              return (
-                <Group gap="sm">
-                  {member && <Avatar avatar={member.avatar} size={24} />}
-                  <Text size="sm">{option.label}</Text>
-                </Group>
-              );
-            }}
-          />
-          
-          <Select
-            label="What activity?"
-            placeholder="Select activity"
-            data={Object.entries(groupedActivities).flatMap(([category, acts]) => [
-              { value: `cat-${category}`, label: category.charAt(0).toUpperCase() + category.slice(1), disabled: true },
-              ...acts.map(a => ({ value: a.id.toString(), label: `${a.icon} ${a.name} (+${a.points} pts)` }))
-            ])}
-            value={selectedActivity}
-            onChange={setSelectedActivity}
-            size="md"
-            searchable
-          />
-          
-          <NumberInput
-            label="Duration (optional)"
-            placeholder="Minutes"
-            value={duration}
-            onChange={(val) => setDuration(val as number | '')}
-            min={1}
-            max={480}
-            suffix=" mins"
-          />
-          
-          <Textarea
-            label="Notes (optional)"
-            placeholder="How was it?"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            minRows={2}
-          />
-          
-          <Button 
-            fullWidth 
-            size="lg"
-            variant="gradient"
-            gradient={{ from: 'teal', to: 'green' }}
-            onClick={handleLogActivity}
+      {/* POS-Style Activity Picker */}
+      <Modal
+        opened={pickerOpen}
+        onClose={() => {
+          setPickerOpen(false);
+          setSelectedMember(null);
+        }}
+        fullScreen
+        withCloseButton={false}
+        padding={0}
+        styles={{ body: { height: '100%', display: 'flex', flexDirection: 'column' } }}
+      >
+        <Box style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#f8f9fa' }}>
+          {/* Header */}
+          <Paper 
+            p="md" 
+            radius={0}
+            style={{ background: 'linear-gradient(135deg, #20c997 0%, #12b886 100%)', flexShrink: 0 }}
           >
-            Log Activity 💪
-          </Button>
-        </Stack>
+            <Group justify="space-between">
+              <Group gap="md">
+                {selectedMember && (
+                  <ActionIcon 
+                    variant="white" 
+                    size="lg" 
+                    onClick={() => setSelectedMember(null)}
+                  >
+                    <IconArrowLeft size={20} />
+                  </ActionIcon>
+                )}
+                <Text style={{ fontSize: '2rem' }}>🏃</Text>
+                <Box>
+                  <Title order={3} c="white">
+                    {selectedMember ? `Log Activity for ${selectedMember.name}` : 'Who did the activity?'}
+                  </Title>
+                  <Text size="sm" c="white" style={{ opacity: 0.9 }}>
+                    {selectedMember ? 'Tap an activity to log it' : 'Tap a family member to start'}
+                  </Text>
+                </Box>
+              </Group>
+              <CloseButton 
+                size="xl" 
+                variant="white" 
+                onClick={() => {
+                  setPickerOpen(false);
+                  setSelectedMember(null);
+                }}
+                style={{ color: 'white' }}
+              />
+            </Group>
+          </Paper>
+
+          {/* Content */}
+          <ScrollArea style={{ flex: 1 }} p="lg">
+            {!selectedMember ? (
+              /* Step 1: Select Family Member */
+              <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="lg">
+                {members.map(member => (
+                  <Paper
+                    key={member.id}
+                    p="xl"
+                    radius="xl"
+                    shadow="md"
+                    style={{ 
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      border: '3px solid transparent',
+                      background: 'white',
+                    }}
+                    onClick={() => setSelectedMember(member)}
+                    className="pos-card-hover"
+                  >
+                    <Center>
+                      <Stack align="center" gap="md">
+                        <Box style={{ 
+                          width: 100, 
+                          height: 100, 
+                          borderRadius: '50%', 
+                          background: `${member.color}20`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Avatar avatar={member.avatar} size={70} />
+                        </Box>
+                        <Text fw={700} size="xl">{member.name}</Text>
+                      </Stack>
+                    </Center>
+                  </Paper>
+                ))}
+              </SimpleGrid>
+            ) : (
+              /* Step 2: Select Activity */
+              <Stack gap="xl">
+                {sortedCategories.map(category => (
+                  <Box key={category}>
+                    <Text fw={700} size="lg" mb="md" tt="capitalize" c="dimmed">
+                      {category}
+                    </Text>
+                    <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }} spacing="md">
+                      {groupedActivities[category].map(activity => (
+                        <Paper
+                          key={activity.id}
+                          p="lg"
+                          radius="lg"
+                          shadow="sm"
+                          style={{ 
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                            border: '2px solid transparent',
+                            background: 'white',
+                          }}
+                          onClick={() => handleLogActivity(activity.id)}
+                          className="pos-card-hover"
+                        >
+                          <Center mb="sm">
+                            <Text style={{ fontSize: '3rem' }}>{activity.icon}</Text>
+                          </Center>
+                          <Text fw={600} ta="center" size="md" mb="xs">
+                            {activity.name}
+                          </Text>
+                          <Center>
+                            <Badge color="teal" variant="light" size="lg">
+                              +{activity.points} pts
+                            </Badge>
+                          </Center>
+                        </Paper>
+                      ))}
+                    </SimpleGrid>
+                  </Box>
+                ))}
+              </Stack>
+            )}
+          </ScrollArea>
+        </Box>
       </Modal>
+
+      <style>{`
+        .pos-card-hover:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+          border-color: #20c997 !important;
+        }
+      `}</style>
     </Container>
   );
 }
