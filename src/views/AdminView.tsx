@@ -41,6 +41,7 @@ import {
   IconStar,
   IconToolsKitchen2,
   IconExternalLink,
+  IconActivity,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import * as api from '../api';
@@ -97,6 +98,24 @@ export default function AdminView() {
   });
   const [recipeSearch, setRecipeSearch] = useState('');
 
+  // Activities (Fitness)
+  interface Activity {
+    id: number;
+    name: string;
+    icon: string;
+    points: number;
+    category: string;
+  }
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activityModalOpened, { open: openActivityModal, close: closeActivityModal }] = useDisclosure();
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [activityForm, setActivityForm] = useState({
+    name: '',
+    icon: '🏃',
+    points: 5,
+    category: 'general',
+  });
+
   // Search filters
   const [choreSearch, setChoreSearch] = useState('');
   const [scheduleSearch, setScheduleSearch] = useState('');
@@ -124,13 +143,14 @@ export default function AdminView() {
 
   const loadAllData = async () => {
     try {
-      const [membersData, choresData, assignmentsData, historyData, extraTasksData, recipesData] = await Promise.all([
+      const [membersData, choresData, assignmentsData, historyData, extraTasksData, recipesData, activitiesData] = await Promise.all([
         api.getMembers(),
         api.getChores(),
         api.getAssignments(),
         api.getHistory(4),
         api.getExtraTasks(),
         api.getRecipes(),
+        fetch('/api/activities').then(r => r.json()),
       ]);
       setMembers(membersData);
       setChores(choresData);
@@ -138,6 +158,7 @@ export default function AdminView() {
       setHistory(historyData);
       setExtraTasks(extraTasksData);
       setRecipes(recipesData);
+      setActivities(activitiesData);
     } catch {
       notifications.show({
         title: 'Error',
@@ -348,6 +369,35 @@ export default function AdminView() {
     setRecipeForm({ title: '', icon: '🍽️', description: '' });
   };
 
+  // Activity handlers
+  const handleSaveActivity = async () => {
+    try {
+      if (editingActivity) {
+        await fetch(`/api/activities/${editingActivity.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(activityForm),
+        });
+      } else {
+        await fetch('/api/activities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(activityForm),
+        });
+      }
+      loadAllData();
+      closeActivityModal();
+      setActivityForm({ name: '', icon: '🏃', points: 5, category: 'general' });
+      notifications.show({
+        title: 'Success',
+        message: editingActivity ? 'Activity updated' : 'Activity added',
+        color: 'green',
+      });
+    } catch {
+      notifications.show({ title: 'Error', message: 'Failed to save activity', color: 'red' });
+    }
+  };
+
   const handleDeleteChore = async (id: number) => {
     if (!confirm('Delete this chore? This will also delete all assignments.')) return;
     try {
@@ -509,6 +559,7 @@ export default function AdminView() {
             <Tabs.Tab value="chores" leftSection={<IconChecklist size={16} />}>Chores</Tabs.Tab>
             <Tabs.Tab value="assignments" leftSection={<IconCalendar size={16} />}>Schedule</Tabs.Tab>
             <Tabs.Tab value="recipes" leftSection={<IconToolsKitchen2 size={16} />}>Recipes</Tabs.Tab>
+            <Tabs.Tab value="activities" leftSection={<IconActivity size={16} />}>Activities</Tabs.Tab>
             <Tabs.Tab value="history" leftSection={<IconHistory size={16} />}>History</Tabs.Tab>
             <Tabs.Tab value="settings" leftSection={<IconSettings size={16} />}>Bonus Tasks</Tabs.Tab>
           </Tabs.List>
@@ -612,60 +663,53 @@ export default function AdminView() {
             </Group>
           </Group>
 
-          <div className="admin-grid">
-            {chores
-              .filter(c => c.title.toLowerCase().includes(choreSearch.toLowerCase()))
-              .map(chore => (
-              <div key={chore.id} className="admin-card">
-                <Group gap="md">
-                  <div
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 12,
-                      background: '#f1f5f9',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 28
-                    }}
-                  >
-                    {chore.icon}
-                  </div>
-                  <div>
-                    <Text fw={700} size="lg">{chore.title}</Text>
-                  </div>
-                </Group>
-                <Group gap="xs">
-                  <ActionIcon 
-                    variant="light" 
-                    size="lg"
-                    radius="xl"
-                    onClick={() => openEditChore(chore)}
-                  >
-                    <IconEdit size={18} />
-                  </ActionIcon>
-                  <ActionIcon 
-                    variant="light" 
-                    color="red" 
-                    size="lg"
-                    radius="xl"
-                    onClick={() => handleDeleteChore(chore.id)}
-                  >
-                    <IconTrash size={18} />
-                  </ActionIcon>
-                </Group>
-              </div>
-            ))}
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Icon</Table.Th>
+                <Table.Th>Title</Table.Th>
+                <Table.Th>Points</Table.Th>
+                <Table.Th>Actions</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {chores
+                .filter(c => c.title.toLowerCase().includes(choreSearch.toLowerCase()))
+                .map(chore => (
+                <Table.Tr key={chore.id}>
+                  <Table.Td><Text size="xl">{chore.icon}</Text></Table.Td>
+                  <Table.Td><Text fw={500}>{chore.title}</Text></Table.Td>
+                  <Table.Td><Badge color="blue">{chore.points} pts</Badge></Table.Td>
+                  <Table.Td>
+                    <Group gap="xs">
+                      <ActionIcon
+                        variant="subtle"
+                        color="blue"
+                        onClick={() => openEditChore(chore)}
+                      >
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        onClick={() => handleDeleteChore(chore.id)}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
             
-            {chores.length === 0 && (
-              <Paper p="xl" ta="center" radius="lg" className="empty-state">
-                <Text size="3rem" mb="sm">📋</Text>
-                <Text fw={600}>No chores yet</Text>
-                <Text size="sm" c="dimmed">Add some chores to assign to family members</Text>
-              </Paper>
-            )}
-          </div>
+          {chores.length === 0 && (
+            <Paper p="xl" ta="center" radius="lg" mt="lg">
+              <Text size="3rem" mb="sm">📋</Text>
+              <Text fw={600}>No chores yet</Text>
+              <Text size="sm" c="dimmed">Add some chores to assign to family members</Text>
+            </Paper>
+          )}
         </Tabs.Panel>
 
         {/* ASSIGNMENTS TAB */}
@@ -894,6 +938,85 @@ export default function AdminView() {
               </Paper>
             )}
           </div>
+        </Tabs.Panel>
+
+        {/* ACTIVITIES TAB */}
+        <Tabs.Panel value="activities">
+          <Group justify="space-between" mb="lg">
+            <Text fw={700} size="lg">Fitness Activities</Text>
+            <Button 
+              leftSection={<IconPlus size={16} />}
+              onClick={() => {
+                setEditingActivity(null);
+                setActivityForm({ name: '', icon: '🏃', points: 5, category: 'general' });
+                openActivityModal();
+              }}
+            >
+              Add Activity
+            </Button>
+          </Group>
+          
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Icon</Table.Th>
+                <Table.Th>Name</Table.Th>
+                <Table.Th>Points</Table.Th>
+                <Table.Th>Category</Table.Th>
+                <Table.Th>Actions</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {activities.map(activity => (
+                <Table.Tr key={activity.id}>
+                  <Table.Td><Text size="xl">{activity.icon}</Text></Table.Td>
+                  <Table.Td>{activity.name}</Table.Td>
+                  <Table.Td><Badge color="teal">{activity.points} pts</Badge></Table.Td>
+                  <Table.Td><Badge variant="light">{activity.category}</Badge></Table.Td>
+                  <Table.Td>
+                    <Group gap="xs">
+                      <ActionIcon
+                        variant="subtle"
+                        color="blue"
+                        onClick={() => {
+                          setEditingActivity(activity);
+                          setActivityForm({
+                            name: activity.name,
+                            icon: activity.icon,
+                            points: activity.points,
+                            category: activity.category,
+                          });
+                          openActivityModal();
+                        }}
+                      >
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        onClick={async () => {
+                          if (confirm(`Delete "${activity.name}"?`)) {
+                            await fetch(`/api/activities/${activity.id}`, { method: 'DELETE' });
+                            loadAllData();
+                          }
+                        }}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+          
+          {activities.length === 0 && (
+            <Paper p="xl" ta="center" radius="lg" mt="lg">
+              <Text size="3rem" mb="sm">🏃</Text>
+              <Text fw={600}>No activities yet</Text>
+              <Text size="sm" c="dimmed">Add activities for family fitness tracking</Text>
+            </Paper>
+          )}
         </Tabs.Panel>
 
         {/* HISTORY TAB */}
@@ -1375,6 +1498,62 @@ export default function AdminView() {
               disabled={!recipeForm.title.trim()}
             >
               {editingRecipe ? 'Save Changes' : 'Add Recipe'}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Activity Modal */}
+      <Modal
+        opened={activityModalOpened}
+        onClose={closeActivityModal}
+        title={editingActivity ? 'Edit Activity' : 'Add Activity'}
+        centered
+        radius="lg"
+      >
+        <Stack gap="md">
+          <TextInput
+            label="Activity Name"
+            placeholder="e.g., Morning Jog"
+            value={activityForm.name}
+            onChange={(e) => setActivityForm({ ...activityForm, name: e.target.value })}
+            required
+          />
+          
+          <TextInput
+            label="Icon"
+            placeholder="e.g., 🏃"
+            value={activityForm.icon}
+            onChange={(e) => setActivityForm({ ...activityForm, icon: e.target.value })}
+          />
+          
+          <NumberInput
+            label="Points"
+            value={activityForm.points}
+            onChange={(val) => setActivityForm({ ...activityForm, points: val as number || 5 })}
+            min={1}
+            max={50}
+          />
+          
+          <TextInput
+            label="Category"
+            placeholder="e.g., cardio, strength, flexibility"
+            value={activityForm.category}
+            onChange={(e) => setActivityForm({ ...activityForm, category: e.target.value })}
+          />
+
+          <Group justify="flex-end" mt="md" gap="sm">
+            <Button variant="subtle" onClick={closeActivityModal} radius="xl">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveActivity}
+              radius="xl"
+              color="teal"
+              leftSection={<IconCheck size={18} />}
+              disabled={!activityForm.name.trim()}
+            >
+              {editingActivity ? 'Save Changes' : 'Add Activity'}
             </Button>
           </Group>
         </Stack>

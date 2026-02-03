@@ -2912,6 +2912,334 @@ app.post('/api/calendar/sync', async (req, res) => {
   }
 });
 
+// ================== FITNESS TRACKING API ==================
+
+// Get all activities
+app.get('/api/activities', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, icon, points, category FROM activities ORDER BY category, name'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching activities:', err);
+    res.status(500).json({ error: 'Failed to fetch activities' });
+  }
+});
+
+// Create activity
+app.post('/api/activities', async (req, res) => {
+  try {
+    const { name, icon, points, category } = req.body;
+    const result = await pool.query(
+      `INSERT INTO activities (name, icon, points, category)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [name, icon || '🏃', points || 5, category || 'general']
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error creating activity:', err);
+    res.status(500).json({ error: 'Failed to create activity' });
+  }
+});
+
+// Update activity
+app.put('/api/activities/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, icon, points, category } = req.body;
+    const result = await pool.query(
+      `UPDATE activities SET name = $1, icon = $2, points = $3, category = $4
+       WHERE id = $5 RETURNING *`,
+      [name, icon, points, category, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Activity not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updating activity:', err);
+    res.status(500).json({ error: 'Failed to update activity' });
+  }
+});
+
+// Delete activity
+app.delete('/api/activities/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM activities WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting activity:', err);
+    res.status(500).json({ error: 'Failed to delete activity' });
+  }
+});
+
+// Log an activity
+app.post('/api/activity-logs', async (req, res) => {
+  try {
+    const { member_id, activity_id, duration_mins, notes, log_date } = req.body;
+    const date = log_date || getSydneyDate();
+    
+    const result = await pool.query(
+      `INSERT INTO activity_logs (member_id, activity_id, log_date, duration_mins, notes)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [member_id, activity_id, date, duration_mins || null, notes || null]
+    );
+    
+    // Update streak
+    await updateFitnessStreak(member_id);
+    
+    // Award points
+    const activity = await pool.query('SELECT points FROM activities WHERE id = $1', [activity_id]);
+    if (activity.rows.length > 0) {
+      // Track analytics
+      await pool.query(
+        `INSERT INTO analytics_events (event_type, member_id, metadata)
+         VALUES ('activity_logged', $1, $2)`,
+        [member_id, JSON.stringify({ activity_id, points: activity.rows[0].points })]
+      );
+    }
+    
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error logging activity:', err);
+    res.status(500).json({ error: 'Failed to log activity' });
+  }
+});
+
+// Get activity logs for a member
+app.get('/api/activity-logs/member/:memberId', async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const { days = 7 } = req.query;
+    
+    const result = await pool.query(
+      `SELECT al.*, a.name as activity_name, a.icon as activity_icon, a.points as activity_points
+       FROM activity_logs al
+       JOIN activities a ON al.activity_id = a.id
+       WHERE al.member_id = $1 AND al.log_date >= CURRENT_DATE - $2::int
+       ORDER BY al.log_date DESC, al.created_at DESC`,
+      [memberId, days]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching activity logs:', err);
+    res.status(500).json({ error: 'Failed to fetch activity logs' });
+  }
+});
+
+// Get today's activities for all members
+app.get('/api/activity-logs/today', async (req, res) => {
+  try {
+    const today = getSydneyDate();
+    const result = await pool.query(
+      `SELECT al.*, a.name as activity_name, a.icon as activity_icon, a.points as activity_points,
+              fm.name as member_name, fm.avatar as member_avatar
+       FROM activity_logs al
+       JOIN activities a ON al.activity_id = a.id
+       JOIN family_members fm ON al.member_id = fm.id
+       WHERE al.log_date = $1
+       ORDER BY al.created_at DESC`,
+      [today]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching today activities:', err);
+    res.status(500).json({ error: 'Failed to fetch today activities' });
+  }
+});
+
+// Get weekly family stats
+app.get('/api/fitness/weekly-stats', async (req, res) => {
+  try {
+    const weekStart = getWeekStart();
+    
+    // Total activities this week
+    const totalResult = await pool.query(
+      `SELECT COUNT(*) as total_activities, COALESCE(SUM(a.points), 0) as total_points
+       FROM activity_logs al
+       JOIN activities a ON al.activity_id = a.id
+       WHERE al.log_date >= $1`,
+      [weekStart]
+    );
+    
+    // Per-member breakdown
+    const memberResult = await pool.query(
+      `SELECT fm.id, fm.name, fm.avatar, fm.color,
+              COUNT(al.id) as activity_count,
+              COALESCE(SUM(a.points), 0) as points
+       FROM family_members fm
+       LEFT JOIN activity_logs al ON fm.id = al.member_id AND al.log_date >= $1
+       LEFT JOIN activities a ON al.activity_id = a.id
+       GROUP BY fm.id, fm.name, fm.avatar, fm.color
+       ORDER BY points DESC`,
+      [weekStart]
+    );
+    
+    // Days with activity this week
+    const daysResult = await pool.query(
+      `SELECT DISTINCT log_date FROM activity_logs WHERE log_date >= $1`,
+      [weekStart]
+    );
+    
+    res.json({
+      week_start: weekStart,
+      total_activities: parseInt(totalResult.rows[0].total_activities),
+      total_points: parseInt(totalResult.rows[0].total_points),
+      active_days: daysResult.rows.length,
+      members: memberResult.rows.map(m => ({
+        ...m,
+        activity_count: parseInt(m.activity_count),
+        points: parseInt(m.points)
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching weekly stats:', err);
+    res.status(500).json({ error: 'Failed to fetch weekly stats' });
+  }
+});
+
+// Get member's fitness streak
+app.get('/api/fitness/streak/:memberId', async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const result = await pool.query(
+      `SELECT * FROM fitness_streaks WHERE member_id = $1`,
+      [memberId]
+    );
+    
+    if (result.rows.length === 0) {
+      res.json({ current_streak: 0, longest_streak: 0, last_activity_date: null });
+    } else {
+      res.json(result.rows[0]);
+    }
+  } catch (err) {
+    console.error('Error fetching streak:', err);
+    res.status(500).json({ error: 'Failed to fetch streak' });
+  }
+});
+
+// Get all streaks
+app.get('/api/fitness/streaks', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT fs.*, fm.name, fm.avatar, fm.color
+       FROM fitness_streaks fs
+       JOIN family_members fm ON fs.member_id = fm.id
+       ORDER BY fs.current_streak DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching streaks:', err);
+    res.status(500).json({ error: 'Failed to fetch streaks' });
+  }
+});
+
+// Delete an activity log
+app.delete('/api/activity-logs/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      'DELETE FROM activity_logs WHERE id = $1 RETURNING member_id',
+      [id]
+    );
+    
+    if (result.rows.length > 0) {
+      // Recalculate streak
+      await updateFitnessStreak(result.rows[0].member_id);
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting activity log:', err);
+    res.status(500).json({ error: 'Failed to delete activity log' });
+  }
+});
+
+// Helper function to update fitness streak
+async function updateFitnessStreak(memberId) {
+  try {
+    // Get all activity dates for this member, ordered desc
+    const result = await pool.query(
+      `SELECT DISTINCT log_date FROM activity_logs 
+       WHERE member_id = $1 
+       ORDER BY log_date DESC`,
+      [memberId]
+    );
+    
+    if (result.rows.length === 0) {
+      // No activities, reset streak
+      await pool.query(
+        `INSERT INTO fitness_streaks (member_id, current_streak, longest_streak, last_activity_date, updated_at)
+         VALUES ($1, 0, 0, NULL, NOW())
+         ON CONFLICT (member_id) DO UPDATE SET
+           current_streak = 0,
+           last_activity_date = NULL,
+           updated_at = NOW()`,
+        [memberId]
+      );
+      return;
+    }
+    
+    const dates = result.rows.map(r => r.log_date);
+    const today = getSydneyDate();
+    
+    // Calculate current streak
+    let streak = 0;
+    let checkDate = new Date(today);
+    
+    for (const date of dates) {
+      const dateStr = new Date(date).toISOString().split('T')[0];
+      const checkStr = checkDate.toISOString().split('T')[0];
+      
+      if (dateStr === checkStr) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else if (dateStr < checkStr) {
+        // Missed a day, streak broken (unless it's today and no activity yet)
+        if (streak === 0) {
+          // Check if the first activity was yesterday
+          const yesterday = new Date(today);
+          yesterday.setDate(yesterday.getDate() - 1);
+          if (dateStr === yesterday.toISOString().split('T')[0]) {
+            streak = 1;
+            checkDate = new Date(yesterday);
+            checkDate.setDate(checkDate.getDate() - 1);
+            continue;
+          }
+        }
+        break;
+      }
+    }
+    
+    // Get current longest streak
+    const currentData = await pool.query(
+      'SELECT longest_streak FROM fitness_streaks WHERE member_id = $1',
+      [memberId]
+    );
+    const longestStreak = currentData.rows.length > 0 
+      ? Math.max(currentData.rows[0].longest_streak, streak)
+      : streak;
+    
+    // Update streak
+    await pool.query(
+      `INSERT INTO fitness_streaks (member_id, current_streak, longest_streak, last_activity_date, updated_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (member_id) DO UPDATE SET
+         current_streak = $2,
+         longest_streak = GREATEST(fitness_streaks.longest_streak, $3),
+         last_activity_date = $4,
+         updated_at = NOW()`,
+      [memberId, streak, longestStreak, dates[0]]
+    );
+  } catch (err) {
+    console.error('Error updating streak:', err);
+  }
+}
+
 // ================== STATIC FILES ==================
 
 // Serve audio files from /tmp

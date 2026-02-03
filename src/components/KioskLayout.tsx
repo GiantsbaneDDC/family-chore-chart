@@ -11,6 +11,7 @@ import {
   IconRobot,
   IconCalendar,
   IconCloud,
+  IconActivity,
 } from '@tabler/icons-react';
 
 interface NavItem {
@@ -26,6 +27,7 @@ const navItems: NavItem[] = [
   { to: '/calendar', icon: IconCalendar, label: 'Calendar', color: 'cyan' },
   { to: '/weather', icon: IconCloud, label: 'Weather', color: 'indigo' },
   { to: '/dinner', icon: IconToolsKitchen2, label: 'Dinner Plan', color: 'red' },
+  { to: '/fitness', icon: IconActivity, label: 'Fitness', color: 'teal' },
   { to: '/rewards', icon: IconTrophy, label: 'Rewards', color: 'yellow' },
   { to: '/admin', icon: IconSettings, label: 'Settings', color: 'gray' },
 ];

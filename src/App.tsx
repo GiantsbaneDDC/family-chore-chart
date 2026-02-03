@@ -10,6 +10,7 @@ import DinnerPlanView from './views/DinnerPlanView';
 import RecipeView from './views/RecipeView';
 import CalendarView from './views/CalendarView';
 import WeatherView from './views/WeatherView';
+import FitnessView from './views/FitnessView';
 import { KioskLayout } from './components/KioskLayout';
 import { IdleScreen } from './components/IdleScreen';
 
@@ -29,6 +30,7 @@ function AppRoutes() {
       <Route path="/recipe/:id" element={<RecipeView />} />
       <Route path="/calendar" element={<CalendarView />} />
       <Route path="/weather" element={<WeatherView />} />
+      <Route path="/fitness" element={<FitnessView />} />
     </Routes>
   );
 }
