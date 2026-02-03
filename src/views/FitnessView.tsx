@@ -380,10 +380,10 @@ export default function FitnessView() {
           </Paper>
 
           {/* Content */}
-          <ScrollArea style={{ flex: 1 }} p="lg">
+          <ScrollArea style={{ flex: 1 }} p="lg" pt="xl">
             {!selectedMember ? (
               /* Step 1: Select Family Member */
-              <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="lg">
+              <SimpleGrid cols={{ base: 2, sm: 3, md: 4 }} spacing="lg" style={{ paddingTop: 8 }}>
                 {members.map(member => (
                   <Paper
                     key={member.id}

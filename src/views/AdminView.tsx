@@ -663,60 +663,53 @@ export default function AdminView() {
             </Group>
           </Group>
 
-          <div className="admin-grid">
-            {chores
-              .filter(c => c.title.toLowerCase().includes(choreSearch.toLowerCase()))
-              .map(chore => (
-              <div key={chore.id} className="admin-card">
-                <Group gap="md">
-                  <div
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 12,
-                      background: '#f1f5f9',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 28
-                    }}
-                  >
-                    {chore.icon}
-                  </div>
-                  <div>
-                    <Text fw={700} size="lg">{chore.title}</Text>
-                  </div>
-                </Group>
-                <Group gap="xs">
-                  <ActionIcon 
-                    variant="light" 
-                    size="lg"
-                    radius="xl"
-                    onClick={() => openEditChore(chore)}
-                  >
-                    <IconEdit size={18} />
-                  </ActionIcon>
-                  <ActionIcon 
-                    variant="light" 
-                    color="red" 
-                    size="lg"
-                    radius="xl"
-                    onClick={() => handleDeleteChore(chore.id)}
-                  >
-                    <IconTrash size={18} />
-                  </ActionIcon>
-                </Group>
-              </div>
-            ))}
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Icon</Table.Th>
+                <Table.Th>Title</Table.Th>
+                <Table.Th>Points</Table.Th>
+                <Table.Th>Actions</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {chores
+                .filter(c => c.title.toLowerCase().includes(choreSearch.toLowerCase()))
+                .map(chore => (
+                <Table.Tr key={chore.id}>
+                  <Table.Td><Text size="xl">{chore.icon}</Text></Table.Td>
+                  <Table.Td><Text fw={500}>{chore.title}</Text></Table.Td>
+                  <Table.Td><Badge color="blue">{chore.points} pts</Badge></Table.Td>
+                  <Table.Td>
+                    <Group gap="xs">
+                      <ActionIcon
+                        variant="subtle"
+                        color="blue"
+                        onClick={() => openEditChore(chore)}
+                      >
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        onClick={() => handleDeleteChore(chore.id)}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
             
-            {chores.length === 0 && (
-              <Paper p="xl" ta="center" radius="lg" className="empty-state">
-                <Text size="3rem" mb="sm">📋</Text>
-                <Text fw={600}>No chores yet</Text>
-                <Text size="sm" c="dimmed">Add some chores to assign to family members</Text>
-              </Paper>
-            )}
-          </div>
+          {chores.length === 0 && (
+            <Paper p="xl" ta="center" radius="lg" mt="lg">
+              <Text size="3rem" mb="sm">📋</Text>
+              <Text fw={600}>No chores yet</Text>
+              <Text size="sm" c="dimmed">Add some chores to assign to family members</Text>
+            </Paper>
+          )}
         </Tabs.Panel>
 
         {/* ASSIGNMENTS TAB */}
