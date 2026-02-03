@@ -1,0 +1,249 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model achievements {
+  id                  Int                   @id @default(autoincrement())
+  key                 String                @unique @db.VarChar(100)
+  title               String                @db.VarChar(100)
+  description         String
+  icon                String                @db.VarChar(10)
+  points_value        Int                   @default(10)
+  created_at          DateTime?             @default(now()) @db.Timestamp(6)
+  member_achievements member_achievements[]
+}
+
+model activities {
+  id            Int             @id @default(autoincrement())
+  name          String          @db.VarChar(100)
+  icon          String          @default("🏃") @db.VarChar(10)
+  points        Int             @default(5)
+  category      String?         @default("general") @db.VarChar(50)
+  created_at    DateTime?       @default(now()) @db.Timestamp(6)
+  activity_logs activity_logs[]
+}
+
+model activity_logs {
+  id             Int            @id @default(autoincrement())
+  member_id      Int
+  activity_id    Int
+  log_date       DateTime       @default(dbgenerated("CURRENT_DATE")) @db.Date
+  duration_mins  Int?
+  notes          String?
+  created_at     DateTime?      @default(now()) @db.Timestamp(6)
+  activities     activities     @relation(fields: [activity_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  family_members family_members @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([activity_id], map: "idx_activity_logs_activity")
+  @@index([log_date], map: "idx_activity_logs_date")
+  @@index([member_id], map: "idx_activity_logs_member")
+}
+
+model admin_settings {
+  id         Int       @id @default(autoincrement())
+  key        String    @unique @db.VarChar(100)
+  value      String
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model allowance_history {
+  id             Int            @id @default(autoincrement())
+  member_id      Int
+  amount         Decimal        @db.Decimal(10, 2)
+  description    String?        @db.VarChar(255)
+  created_at     DateTime?      @default(now()) @db.Timestamp(6)
+  family_members family_members @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_allowance_history_created")
+  @@index([member_id], map: "idx_allowance_history_member")
+}
+
+model analytics_events {
+  id             Int             @id @default(autoincrement())
+  event_type     String          @db.VarChar(100)
+  member_id      Int?
+  metadata       Json?           @default("{}")
+  created_at     DateTime?       @default(now()) @db.Timestamp(6)
+  family_members family_members? @relation(fields: [member_id], references: [id], onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_analytics_events_created")
+  @@index([member_id], map: "idx_analytics_events_member")
+  @@index([event_type], map: "idx_analytics_events_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model assignments {
+  id             Int            @id @default(autoincrement())
+  chore_id       Int
+  member_id      Int
+  day_of_week    Int
+  created_at     DateTime?      @default(now()) @db.Timestamp(6)
+  chores         chores         @relation(fields: [chore_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  family_members family_members @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  completions    completions[]
+
+  @@unique([chore_id, member_id, day_of_week])
+}
+
+model calendar_events {
+  id          Int       @id @default(autoincrement())
+  google_id   String    @unique @db.VarChar(255)
+  title       String    @db.VarChar(500)
+  start_time  DateTime  @db.Timestamptz(6)
+  end_time    DateTime  @db.Timestamptz(6)
+  all_day     Boolean?  @default(false)
+  location    String?
+  description String?
+  color_id    String?   @db.VarChar(10)
+  raw_data    Json?
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  updated_at  DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([google_id], map: "idx_calendar_events_google_id")
+  @@index([start_time], map: "idx_calendar_events_start")
+}
+
+model chores {
+  id          Int           @id @default(autoincrement())
+  title       String        @db.VarChar(255)
+  icon        String        @default("📋") @db.VarChar(10)
+  points      Int           @default(1)
+  created_at  DateTime?     @default(now()) @db.Timestamp(6)
+  money_value Decimal?      @db.Decimal(10, 2)
+  assignments assignments[]
+}
+
+model completions {
+  id            Int         @id @default(autoincrement())
+  assignment_id Int
+  week_start    DateTime    @db.Date
+  completed_at  DateTime?   @default(now()) @db.Timestamp(6)
+  assignments   assignments @relation(fields: [assignment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([assignment_id, week_start])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model dinner_plans {
+  id          Int       @id @default(autoincrement())
+  recipe_id   Int?
+  day_of_week Int
+  week_start  DateTime  @db.Date
+  notes       String?
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  recipes     recipes?  @relation(fields: [recipe_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([day_of_week, week_start])
+  @@index([week_start], map: "idx_dinner_plans_week")
+}
+
+model extra_task_claims {
+  id             Int            @id @default(autoincrement())
+  extra_task_id  Int
+  member_id      Int
+  claimed_date   DateTime       @default(dbgenerated("CURRENT_DATE")) @db.Date
+  completed_at   DateTime?      @db.Timestamp(6)
+  created_at     DateTime?      @default(now()) @db.Timestamp(6)
+  extra_tasks    extra_tasks    @relation(fields: [extra_task_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  family_members family_members @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([extra_task_id, claimed_date])
+  @@index([claimed_date], map: "idx_extra_task_claims_date")
+  @@index([member_id], map: "idx_extra_task_claims_member")
+}
+
+model extra_tasks {
+  id                Int                 @id @default(autoincrement())
+  title             String              @db.VarChar(255)
+  icon              String              @default("⭐") @db.VarChar(10)
+  stars             Int                 @default(1)
+  created_at        DateTime?           @default(now()) @db.Timestamp(6)
+  extra_task_claims extra_task_claims[]
+}
+
+model family_members {
+  id                  Int                   @id @default(autoincrement())
+  name                String                @db.VarChar(100)
+  color               String                @default("#4dabf7") @db.VarChar(7)
+  avatar              String                @default("👤") @db.VarChar(500)
+  pin                 String                @db.VarChar(4)
+  created_at          DateTime?             @default(now()) @db.Timestamp(6)
+  allowance_balance   Decimal               @default(0) @db.Decimal(10, 2)
+  total_stars         Int?                  @default(0)
+  activity_logs       activity_logs[]
+  allowance_history   allowance_history[]
+  analytics_events    analytics_events[]
+  assignments         assignments[]
+  extra_task_claims   extra_task_claims[]
+  fitness_streaks     fitness_streaks?
+  member_achievements member_achievements[]
+  star_history        star_history[]
+}
+
+model fitness_goals {
+  id           Int       @id @default(autoincrement())
+  name         String    @db.VarChar(100)
+  target_count Int       @default(30)
+  week_start   DateTime  @db.Date
+  completed    Boolean?  @default(false)
+  bonus_points Int?      @default(50)
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([week_start], map: "idx_fitness_goals_week")
+}
+
+model fitness_streaks {
+  id                 Int            @id @default(autoincrement())
+  member_id          Int            @unique
+  current_streak     Int?           @default(0)
+  longest_streak     Int?           @default(0)
+  last_activity_date DateTime?      @db.Date
+  updated_at         DateTime?      @default(now()) @db.Timestamp(6)
+  family_members     family_members @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model member_achievements {
+  id              Int            @id @default(autoincrement())
+  member_id       Int
+  achievement_key String         @db.VarChar(100)
+  earned_at       DateTime?      @default(now()) @db.Timestamp(6)
+  achievements    achievements   @relation(fields: [achievement_key], references: [key], onDelete: Cascade, onUpdate: NoAction)
+  family_members  family_members @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([member_id, achievement_key])
+  @@index([member_id], map: "idx_member_achievements_member")
+}
+
+model recipes {
+  id           Int            @id @default(autoincrement())
+  title        String         @db.VarChar(255)
+  icon         String         @default("🍽️") @db.VarChar(10)
+  description  String?
+  prep_time    Int?
+  cook_time    Int?
+  servings     Int?           @default(4)
+  ingredients  Json?          @default("[]")
+  instructions Json?          @default("[]")
+  tags         Json?          @default("[]")
+  created_at   DateTime?      @default(now()) @db.Timestamp(6)
+  source_url   String?
+  dinner_plans dinner_plans[]
+
+  @@index([tags], map: "idx_recipes_tags", type: Gin)
+}
+
+model star_history {
+  id             Int            @id @default(autoincrement())
+  member_id      Int
+  stars          Int
+  description    String
+  created_at     DateTime?      @default(now()) @db.Timestamp(6)
+  family_members family_members @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([member_id], map: "idx_star_history_member")
+}

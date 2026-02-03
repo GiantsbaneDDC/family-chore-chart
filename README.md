@@ -6,6 +6,7 @@ A fun, gamified chore management app for families. Kids earn stars for completin
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
 ![Mantine](https://img.shields.io/badge/Mantine-7-violet?logo=mantine)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue?logo=postgresql)
+![Prisma](https://img.shields.io/badge/Prisma-7-teal?logo=prisma)
 
 ## ✨ Features
 
@@ -61,7 +62,7 @@ A fun, gamified chore management app for families. Kids earn stars for completin
 - **UI Library:** [Mantine](https://mantine.dev/) v7
 - **Icons:** [Tabler Icons](https://tabler.io/icons)
 - **Backend:** Express.js
-- **Database:** PostgreSQL
+- **Database:** PostgreSQL with [Prisma](https://prisma.io/) ORM
 - **Weather:** Open-Meteo API (free, no key required)
 
 ## 🚀 Quick Start
@@ -88,52 +89,58 @@ npm install
 # Backend
 cd server
 npm install
-cd ..
 ```
 
-### 3. Set Up Database
+### 3. Configure Environment
 
 ```bash
-# Create database and user
-sudo -u postgres psql << EOF
-CREATE DATABASE chorechart;
-CREATE USER chorechart WITH PASSWORD 'chorechart';
-GRANT ALL PRIVILEGES ON DATABASE chorechart TO chorechart;
-ALTER DATABASE chorechart OWNER TO chorechart;
-\c chorechart
-GRANT ALL ON SCHEMA public TO chorechart;
-EOF
+# Copy the example environment file
+cp .env.example .env
 
-# Run migrations
-sudo -u postgres psql -d chorechart -f server/setup-db.sql
-sudo -u postgres psql -d chorechart -f server/migrate-dinner-plan.sql
-sudo -u postgres psql -d chorechart -f server/migrate-source-url.sql
-sudo -u postgres psql -d chorechart -f server/migrate-fitness.sql
+# Edit .env with your database credentials
+nano .env
 ```
 
-### 4. Configure Environment
-
-Create `server/.env`:
-
+Your `.env` should look like:
 ```env
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=chorechart
 DB_USER=chorechart
-DB_PASSWORD=chorechart
+DB_PASSWORD=your-password
 PORT=8080
-SESSION_SECRET=your-secret-key-change-this
+SESSION_SECRET=your-secret-key
+
+DATABASE_URL="postgresql://chorechart:your-password@localhost:5432/chorechart?schema=public"
 ```
+
+### 4. Set Up Database
+
+```bash
+# Create the PostgreSQL database (if not exists)
+createdb chorechart
+
+# Push the schema to the database (creates all tables)
+npm run db:push
+
+# Seed default data (achievements, activities, settings)
+npm run db:seed
+```
+
+That's it! No manual SQL migrations needed. 🎉
 
 ### 5. Build & Run
 
 ```bash
+# Go back to root
+cd ..
+
 # Build frontend
 npm run build
 
 # Start server
 cd server
-node index.js
+npm start
 ```
 
 ### 6. Open the App
@@ -196,7 +203,10 @@ family-chore-chart/
 │   └── types.ts            # TypeScript types
 ├── server/                 # Backend source
 │   ├── index.js            # Express server
-│   └── *.sql               # Database migrations
+│   ├── prisma/
+│   │   ├── schema.prisma   # Database schema
+│   │   └── seed.js         # Seed data
+│   └── generated/          # Prisma client (auto-generated)
 ├── public/                 # Static assets
 └── dist/                   # Production build
 ```
@@ -208,10 +218,35 @@ family-chore-chart/
 npm run dev
 
 # Run backend (separate terminal)
-cd server && node index.js
+cd server && npm run dev
 ```
 
 Frontend dev server runs on `http://localhost:5173` with HMR.
+
+### Database Commands
+
+```bash
+cd server
+
+# Push schema changes to database
+npm run db:push
+
+# Open Prisma Studio (GUI for database)
+npm run db:studio
+
+# Generate Prisma client after schema changes
+npm run db:generate
+
+# Seed the database with default data
+npm run db:seed
+
+# Reset database (caution: deletes all data!)
+npm run db:reset
+```
+
+## 🐳 Docker (Coming Soon)
+
+Docker support is planned for even easier deployment.
 
 ## 📄 License
 
@@ -221,4 +256,5 @@ MIT
 
 - [Mantine](https://mantine.dev/) - Beautiful React components
 - [Tabler Icons](https://tabler.io/icons) - High-quality icons
+- [Prisma](https://prisma.io/) - Modern database ORM
 - [Open-Meteo](https://open-meteo.com/) - Free weather API
