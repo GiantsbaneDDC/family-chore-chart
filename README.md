@@ -21,6 +21,14 @@ A fun, gamified chore management app for families. Kids earn stars for completin
 - Family leaderboard
 - Achievement tracking
 
+### 🏃 Fitness Tracking
+- Log family activities with a POS-style picker
+- 15+ activity types (bike, run, swim, sports, yoga, etc.)
+- Weekly progress tracking toward family goals
+- Streak tracking for consecutive active days
+- Per-member activity leaderboard
+- Admin-manageable activity types
+
 ### 🍽️ Dinner Planning
 - Weekly meal planner
 - Import recipes from any URL (auto-extracts ingredients & instructions)
@@ -100,6 +108,7 @@ EOF
 sudo -u postgres psql -d chorechart -f server/setup-db.sql
 sudo -u postgres psql -d chorechart -f server/migrate-dinner-plan.sql
 sudo -u postgres psql -d chorechart -f server/migrate-source-url.sql
+sudo -u postgres psql -d chorechart -f server/migrate-fitness.sql
 ```
 
 ### 4. Configure Environment
@@ -138,6 +147,7 @@ Visit **http://localhost:8080**
 3. **Create Chores** - Go to Chores tab, add your household chores
 4. **Set Up Schedule** - Go to Schedule tab, assign chores to days/people
 5. **Plan Dinners** - Go to Dinner Plan, search and import recipes
+6. **Track Fitness** - Use the Fitness tab to log family activities
 
 ## 🖼️ Screenshots
 
@@ -147,11 +157,14 @@ Visit **http://localhost:8080**
 ### Chores
 ![Chores](screenshots/chores.png)
 
+### Fitness Tracking
+![Fitness](screenshots/fitness.png)
+
 ### Weather
 ![Weather](screenshots/weather.png)
 
 ### Dinner Planning
-![Dinner Plan](screenshots/dinner.png)
+![Dinner Plan](screenshots/dinner-plan.png)
 
 ### Rewards & Leaderboard
 ![Rewards](screenshots/rewards.png)
