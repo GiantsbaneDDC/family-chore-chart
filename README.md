@@ -151,26 +151,39 @@ Visit **http://localhost:8080**
 
 ## 🖼️ Screenshots
 
-### Home
-![Home](screenshots/home.png)
+### Main Views
 
-### Chores
-![Chores](screenshots/chores.png)
+| Home | Chores | Fitness |
+|:---:|:---:|:---:|
+| ![Home](screenshots/home.png) | ![Chores](screenshots/chores.png) | ![Fitness](screenshots/fitness.png) |
 
-### Fitness Tracking
-![Fitness](screenshots/fitness.png)
+| Weather | Dinner Plan | Rewards |
+|:---:|:---:|:---:|
+| ![Weather](screenshots/weather.png) | ![Dinner Plan](screenshots/dinner-plan.png) | ![Rewards](screenshots/rewards.png) |
 
-### Weather
-![Weather](screenshots/weather.png)
+| Calendar | Recipe |
+|:---:|:---:|
+| ![Calendar](screenshots/calendar.png) | ![Recipe](screenshots/recipe.png) |
 
-### Dinner Planning
-![Dinner Plan](screenshots/dinner-plan.png)
+### Kiosk Mode (POS-Style Pickers)
 
-### Rewards & Leaderboard
-![Rewards](screenshots/rewards.png)
+| Member Select | Chore Picker |
+|:---:|:---:|
+| ![Member Select](screenshots/kiosk-member-select.png) | ![Chore Picker](screenshots/kiosk-chore-picker.png) |
 
-### Calendar
-![Calendar](screenshots/calendar.png)
+| Fitness - Select Member | Fitness - Activity Picker |
+|:---:|:---:|
+| ![Fitness Member](screenshots/fitness-member-select.png) | ![Activity Picker](screenshots/fitness-activity-picker.png) |
+
+### Admin Panel
+
+| Members | Chores | Activities |
+|:---:|:---:|:---:|
+| ![Admin Members](screenshots/admin-members.png) | ![Admin Chores](screenshots/admin-chores.png) | ![Admin Activities](screenshots/admin-activities.png) |
+
+| Rewards | Recipes |
+|:---:|:---:|
+| ![Admin Rewards](screenshots/admin-rewards.png) | ![Admin Recipes](screenshots/admin-recipes.png) |
 
 ## 📁 Project Structure
 
