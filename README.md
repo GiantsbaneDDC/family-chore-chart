@@ -256,6 +256,26 @@ docker compose down -v
 docker compose up -d
 ```
 
+### Unraid
+
+For Unraid users, there's a ready-made template:
+
+1. **Add Template Repository:**
+   - Go to **Docker → Add Container → Template Repositories**
+   - Add: `https://github.com/GiantsbaneDDC/family-chore-chart`
+
+2. **Or Manual Template Install:**
+   - Download [`unraid/my-FamilyChoreChart.xml`](unraid/my-FamilyChoreChart.xml)
+   - Place in `/boot/config/plugins/dockerMan/templates-user/`
+   - Go to **Docker → Add Container** and select "FamilyChoreChart"
+
+3. **Configure:**
+   - **Port:** 8080 (or your preference)
+   - **Data Path:** `/mnt/user/appdata/chore-chart`
+   - **Timezone:** Your timezone (e.g., `Australia/Sydney`)
+
+4. **Apply** and access at `http://[UNRAID-IP]:8080`
+
 ### Environment Variables
 
 Create a `.env` file in the project root for custom settings:

@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>FamilyChoreChart</Name>
+  <Repository>ghcr.io/giantsbaneddc/family-chore-chart:latest</Repository>
+  <Registry>https://ghcr.io/v2/giantsbaneddc/family-chore-chart</Registry>
+  <Branch>
+    <Tag>latest</Tag>
+    <TagDescription>Latest stable release</TagDescription>
+  </Branch>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/GiantsbaneDDC/family-chore-chart/issues</Support>
+  <Project>https://github.com/GiantsbaneDDC/family-chore-chart</Project>
+  <Overview>Family chore tracking app with rewards, allowance system, and achievements. Features a kid-friendly interface with daily/weekly chore assignments, point tracking, and reward redemption.</Overview>
+  <Category>Productivity: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/GiantsbaneDDC/family-chore-chart/master/unraid/my-FamilyChoreChart.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/GiantsbaneDDC/family-chore-chart/master/public/icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled></DateInstalled>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="WebUI Port" Target="8080" Default="8080" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">8080</Config>
+  <Config Name="Data Storage" Target="/app/server/data" Default="/mnt/user/appdata/chore-chart" Mode="rw" Description="Persistent storage for database and uploads" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/chore-chart</Config>
+  <Config Name="Timezone" Target="TZ" Default="Australia/Sydney" Mode="" Description="Container timezone" Type="Variable" Display="always" Required="false" Mask="false">Australia/Sydney</Config>
+  <Config Name="Node Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node environment (production recommended)" Type="Variable" Display="advanced" Required="false" Mask="false">production</Config>
+</Container>
