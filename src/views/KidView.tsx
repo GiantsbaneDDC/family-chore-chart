@@ -16,8 +16,9 @@ import confetti from 'canvas-confetti';
 import dayjs from 'dayjs';
 import * as api from '../api';
 import { Avatar } from '../components/Avatar';
-import type { FamilyMember, Assignment, Completion, StreakData, ExtraTaskClaim } from '../types';
+import type { FamilyMember, Assignment, Completion, StreakData, ExtraTaskClaim, EffectiveTodayAssignment } from '../types';
 import { DAYS, SHORT_DAYS } from '../types';
+import { IconClock } from '@tabler/icons-react';
 
 function fireConfetti() {
   const count = 200;
@@ -48,6 +49,7 @@ export default function KidView() {
   const [member, setMember] = useState<FamilyMember | null>(null);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [completions, setCompletions] = useState<Completion[]>([]);
+  const [effectiveToday, setEffectiveToday] = useState<EffectiveTodayAssignment[]>([]);
   const [extraTaskClaims, setExtraTaskClaims] = useState<ExtraTaskClaim[]>([]);
   const [streak, setStreak] = useState<StreakData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,16 +62,18 @@ export default function KidView() {
         navigate('/my');
         return;
       }
-      const [memberData, assignmentsData, completionsData, streakData, claimsData] = await Promise.all([
+      const [memberData, assignmentsData, completionsData, effectiveTodayData, streakData, claimsData] = await Promise.all([
         api.getMember(id),
         api.getMemberAssignments(id),
         api.getMemberCompletions(id),
+        api.getEffectiveTodayAssignments(id),
         api.getMemberStreak(id),
         api.getTodaysClaims(),
       ]);
       setMember(memberData);
       setAssignments(assignmentsData);
       setCompletions(completionsData);
+      setEffectiveToday(effectiveTodayData);
       setStreak(streakData);
       // Filter claims to only this member
       setExtraTaskClaims(claimsData.filter(c => c.member_id === id));
@@ -149,9 +153,33 @@ export default function KidView() {
   const progressPercent = totalChores > 0 ? Math.round((completedCount / totalChores) * 100) : 100;
 
   // Group assignments by day
-  const assignmentsByDay = DAYS.map((_, i) => 
-    assignments.filter(a => a.day_of_week === i)
-  );
+  // For today: use effectiveToday (includes rollovers)
+  // For past days: only show completed chores (incomplete ones rolled to today)
+  // For future days: show scheduled chores as normal
+  const assignmentsByDay = DAYS.map((_, dayIndex) => {
+    if (dayIndex === today) {
+      // Today: convert effectiveToday to Assignment-like objects
+      return effectiveToday.map(et => ({
+        id: et.id,
+        chore_id: et.chore_id,
+        member_id: et.member_id,
+        day_of_week: today, // Show in today column
+        original_day: et.original_day,
+        chore_title: et.chore_title,
+        chore_icon: et.chore_icon,
+        chore_points: et.chore_points,
+        is_rollover: et.is_rollover,
+        created_at: '',
+      }));
+    } else if (dayIndex < today) {
+      // Past days: only show completed chores
+      return assignments
+        .filter(a => a.day_of_week === dayIndex && isCompleted(a.id));
+    } else {
+      // Future days: show all scheduled
+      return assignments.filter(a => a.day_of_week === dayIndex);
+    }
+  });
 
   // Find max chores in any day for row count (include extra tasks for today)
   const maxChoresPerDay = Math.max(
@@ -369,14 +397,22 @@ export default function KidView() {
               );
             }
             
-            // Regular assignment
-            const assignment = item as Assignment;
+            // Regular assignment (may include rollover info)
+            const assignment = item as Assignment & { is_rollover?: boolean; original_day?: number };
             const completed = isCompleted(assignment.id);
+            const isRollover = assignment.is_rollover === true;
             
             return (
               <Tooltip 
                 key={assignment.id}
-                label={<Box><Text fw={600}>{assignment.chore_title}</Text></Box>}
+                label={
+                  <Box>
+                    <Text fw={600}>{assignment.chore_title}</Text>
+                    {isRollover && (
+                      <Text size="xs" c="orange">⏰ From {SHORT_DAYS[assignment.original_day ?? 0]}</Text>
+                    )}
+                  </Box>
+                }
                 position="top"
               >
                 <Box
@@ -384,9 +420,11 @@ export default function KidView() {
                   style={{
                     background: completed 
                       ? '#dcfce7' 
-                      : isToday 
-                        ? '#eff6ff' 
-                        : '#ffffff',
+                      : isRollover
+                        ? '#fef3c7'  // Warm yellow for rollover
+                        : isToday 
+                          ? '#eff6ff' 
+                          : '#ffffff',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -395,10 +433,19 @@ export default function KidView() {
                     cursor: 'pointer',
                     transition: 'all 0.15s',
                     position: 'relative',
-                    border: completed ? '2px solid #22c55e' : '2px solid transparent',
+                    border: completed 
+                      ? '2px solid #22c55e' 
+                      : isRollover 
+                        ? '2px solid #f59e0b'  // Orange border for rollover
+                        : '2px solid transparent',
                   }}
                 >
-                  <span style={{ fontSize: '1.8rem' }}>{assignment.chore_icon}</span>
+                  <Box style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <span style={{ fontSize: '1.8rem' }}>{assignment.chore_icon}</span>
+                    {isRollover && !completed && (
+                      <IconClock size={14} color="#f59e0b" style={{ marginLeft: -4, marginTop: -16 }} />
+                    )}
+                  </Box>
                   <Text 
                     size="xs" 
                     fw={600} 
