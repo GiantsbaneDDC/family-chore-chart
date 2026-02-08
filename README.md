@@ -65,87 +65,80 @@ A fun, gamified chore management app for families. Kids earn stars for completin
 - **Database:** PostgreSQL with [Prisma](https://prisma.io/) ORM
 - **Weather:** Open-Meteo API (free, no key required)
 
-## 🚀 Quick Start
+## 🚀 Installation
 
-### Prerequisites
+### Option 1: One-Line Install (Recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/GiantsbaneDDC/family-chore-chart/master/scripts/install.sh | bash
+```
+
+This interactive script will:
+- ✅ Check prerequisites (Node.js, PostgreSQL)
+- ✅ Clone the repository
+- ✅ Install all dependencies
+- ✅ Create the database and user
+- ✅ Configure everything automatically
+- ✅ Optionally set up as a system service
+
+### Option 2: Docker (Easiest)
+
+```bash
+git clone https://github.com/GiantsbaneDDC/family-chore-chart.git
+cd family-chore-chart
+docker compose up -d
+```
+
+That's it! Open **http://localhost:8080**
+
+### Option 3: Manual Install
+
+<details>
+<summary>Click to expand manual steps</summary>
+
+#### Prerequisites
 
 - Node.js 18+
 - PostgreSQL 14+
 - npm or pnpm
 
-### 1. Clone the Repository
+#### Steps
 
 ```bash
+# 1. Clone
 git clone https://github.com/GiantsbaneDDC/family-chore-chart.git
 cd family-chore-chart
-```
 
-### 2. Install Dependencies
-
-```bash
-# Frontend
+# 2. Install dependencies
 npm install
+cd server && npm install && cd ..
 
-# Backend
+# 3. Create database
+sudo -u postgres psql -c "CREATE USER chorechart WITH PASSWORD 'yourpassword';"
+sudo -u postgres psql -c "CREATE DATABASE chorechart OWNER chorechart;"
+
+# 4. Configure environment
+cp server/.env.example server/.env
+# Edit server/.env with your database credentials
+
+# 5. Initialize database
 cd server
-npm install
-```
-
-### 3. Configure Environment
-
-```bash
-# Copy the example environment file
-cp .env.example .env
-
-# Edit .env with your database credentials
-nano .env
-```
-
-Your `.env` should look like:
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=chorechart
-DB_USER=chorechart
-DB_PASSWORD=your-password
-PORT=8080
-SESSION_SECRET=your-secret-key
-
-DATABASE_URL="postgresql://chorechart:your-password@localhost:5432/chorechart?schema=public"
-```
-
-### 4. Set Up Database
-
-```bash
-# Create the PostgreSQL database (if not exists)
-createdb chorechart
-
-# Push the schema to the database (creates all tables)
 npm run db:push
-
-# Seed default data (achievements, activities, settings)
 npm run db:seed
-```
-
-That's it! No manual SQL migrations needed. 🎉
-
-### 5. Build & Run
-
-```bash
-# Go back to root
 cd ..
 
-# Build frontend
+# 6. Build and run
 npm run build
-
-# Start server
-cd server
-npm start
+cd server && npm start
 ```
 
-### 6. Open the App
+</details>
 
-Visit **http://localhost:8080**
+### Access the App
+
+Open **http://localhost:8080** (or your server's IP)
+
+**Default admin PIN: `1234`** (change this in settings!)
 
 ## 📱 First Steps
 
@@ -244,9 +237,38 @@ npm run db:seed
 npm run db:reset
 ```
 
-## 🐳 Docker (Coming Soon)
+## 🐳 Docker
 
-Docker support is planned for even easier deployment.
+Full Docker support included:
+
+```bash
+# Start everything (app + database)
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop
+docker compose down
+
+# Reset database (caution: deletes all data)
+docker compose down -v
+docker compose up -d
+```
+
+### Environment Variables
+
+Create a `.env` file in the project root for custom settings:
+
+```env
+DB_PASSWORD=your-secure-password
+SESSION_SECRET=your-random-secret
+```
+
+Or pass directly:
+```bash
+DB_PASSWORD=supersecret docker compose up -d
+```
 
 ## 📄 License
 

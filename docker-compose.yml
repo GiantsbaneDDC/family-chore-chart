@@ -1,0 +1,49 @@
+# 🏠 Family Chore Chart - Docker Compose
+#
+# Quick start:
+#   docker compose up -d
+#
+# Access at: http://localhost:8080
+# Default admin PIN: 1234
+#
+
+services:
+  app:
+    build: .
+    container_name: chore-chart
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - SESSION_SECRET=${SESSION_SECRET:-change-me-to-something-random}
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=chorechart
+      - DB_USER=chorechart
+      - DB_PASSWORD=${DB_PASSWORD:-chorechart123}
+      - DATABASE_URL=postgresql://chorechart:${DB_PASSWORD:-chorechart123}@db:5432/chorechart?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "npx prisma db push && node prisma/seed.cjs; node index.js"
+
+  db:
+    image: postgres:16-alpine
+    container_name: chore-chart-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=chorechart
+      - POSTGRES_USER=chorechart
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-chorechart123}
+    volumes:
+      - chore-chart-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chorechart -d chorechart"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  chore-chart-data:
