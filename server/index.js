@@ -278,6 +278,75 @@ app.get('/api/assignments/member/:memberId', async (req, res) => {
   }
 });
 
+// Get effective "today" stats for ALL members (for home dashboard)
+// Returns count of total and completed chores including rollovers
+app.get('/api/assignments/effective-today-stats', async (req, res) => {
+  try {
+    const today = getSydneyDayOfWeek();
+    const weekStart = getWeekStart();
+    
+    const result = await pool.query(`
+      SELECT 
+        m.id as member_id,
+        m.name,
+        m.avatar,
+        m.color,
+        COUNT(DISTINCT a.id) FILTER (
+          WHERE a.day_of_week = $2 OR comp.id IS NULL
+        ) as total_today,
+        COUNT(DISTINCT a.id) FILTER (
+          WHERE comp.id IS NOT NULL AND (a.day_of_week = $2 OR comp.id IS NULL)
+        ) as completed_today
+      FROM family_members m
+      LEFT JOIN assignments a ON a.member_id = m.id AND a.day_of_week <= $2
+      LEFT JOIN completions comp ON comp.assignment_id = a.id AND comp.week_start = $1
+      GROUP BY m.id, m.name, m.avatar, m.color
+      ORDER BY m.name
+    `, [weekStart, today]);
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching effective today stats:', err);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+// Get effective "today" assignments for a member (includes rollover from earlier this week)
+// Chores that weren't completed on their assigned day roll over to subsequent days
+// until completed. Schedule resets each week.
+app.get('/api/assignments/effective-today/:memberId', async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const today = getSydneyDayOfWeek();
+    const weekStart = getWeekStart();
+    
+    // Get all assignments from Sunday (0) through today, 
+    // LEFT JOIN with completions to find incomplete ones
+    const result = await pool.query(`
+      SELECT 
+        a.id, a.chore_id, a.member_id, a.day_of_week as original_day,
+        c.title as chore_title, c.icon as chore_icon, c.points as chore_points,
+        comp.id as completion_id,
+        CASE WHEN a.day_of_week < $3 AND comp.id IS NULL THEN true ELSE false END as is_rollover
+      FROM assignments a
+      JOIN chores c ON a.chore_id = c.id
+      LEFT JOIN completions comp ON comp.assignment_id = a.id AND comp.week_start = $2
+      WHERE a.member_id = $1 
+        AND a.day_of_week <= $3
+        AND (
+          a.day_of_week = $3  -- Today's scheduled chores (show regardless of completion)
+          OR comp.id IS NULL   -- Earlier chores that are NOT completed (rollover)
+        )
+      ORDER BY a.day_of_week, c.title
+    `, [memberId, weekStart, today]);
+    
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching effective today assignments:', err);
+    res.status(500).json({ error: 'Failed to fetch assignments' });
+  }
+});
+
 // Create assignment
 app.post('/api/assignments', async (req, res) => {
   try {

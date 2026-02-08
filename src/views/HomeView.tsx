@@ -223,32 +223,26 @@ export default function HomeView() {
 
   const loadData = useCallback(async () => {
     try {
-      const [kioskData, dinnerData, leaderboard, calendarData] = await Promise.all([
+      const [effectiveStats, kioskData, dinnerData, calendarData] = await Promise.all([
+        api.getEffectiveTodayStats(),
         api.getKioskData(),
         api.getDinnerPlan(),
-        api.getStarLeaderboard(),
         fetch('/api/calendar/today').then(r => r.json()),
       ]);
 
       const today = dayjs().day();
       
-      // Calculate stats per family member
-      const familyStats: FamilyMemberStats[] = kioskData.members.map(member => {
-        const memberAssignments = kioskData.assignments.filter(
-          a => a.member_id === member.id && a.day_of_week === today
-        );
-        const memberComplete = memberAssignments.filter(
-          a => kioskData.completions.includes(a.id)
-        ).length;
-        
+      // Use effective today stats (includes rollover chores from earlier this week)
+      const familyStats: FamilyMemberStats[] = effectiveStats.map(stat => {
+        const member = kioskData.members.find(m => m.id === stat.member_id);
         return {
-          id: member.id,
-          name: member.name,
-          avatar: member.avatar,
-          color: member.color,
-          todayTotal: memberAssignments.length,
-          todayComplete: memberComplete,
-          totalStars: member.total_stars || 0,
+          id: stat.member_id,
+          name: stat.name,
+          avatar: stat.avatar,
+          color: stat.color,
+          todayTotal: Number(stat.total_today) || 0,
+          todayComplete: Number(stat.completed_today) || 0,
+          totalStars: member?.total_stars || 0,
         };
       });
 

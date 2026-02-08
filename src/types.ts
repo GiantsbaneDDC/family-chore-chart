@@ -36,6 +36,29 @@ export interface Assignment {
   member_avatar?: string;
 }
 
+// Effective "today" assignments including rollovers from earlier in the week
+export interface EffectiveTodayAssignment {
+  id: number;
+  chore_id: number;
+  member_id: number;
+  original_day: number;          // The day it was originally scheduled
+  chore_title: string;
+  chore_icon: string;
+  chore_points: number;
+  completion_id: number | null;  // null = not completed
+  is_rollover: boolean;          // true if this is from an earlier day
+}
+
+// Stats for effective today (for dashboard)
+export interface EffectiveTodayStats {
+  member_id: number;
+  name: string;
+  avatar: string;
+  color: string;
+  total_today: number;
+  completed_today: number;
+}
+
 export interface Completion {
   id: number;
   assignment_id: number;

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { FamilyMember, Chore, Assignment, KioskData, StreakData, PointsData, Completion, ExtraTask, ExtraTaskClaim, StarHistory } from './types';
+import type { FamilyMember, Chore, Assignment, KioskData, StreakData, PointsData, Completion, ExtraTask, ExtraTaskClaim, StarHistory, EffectiveTodayAssignment, EffectiveTodayStats } from './types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -29,6 +29,10 @@ export const deleteChore = (id: number) => api.delete(`/chores/${id}`);
 export const getAssignments = () => api.get<Assignment[]>('/assignments').then(r => r.data);
 export const getMemberAssignments = (memberId: number) => 
   api.get<Assignment[]>(`/assignments/member/${memberId}`).then(r => r.data);
+export const getEffectiveTodayAssignments = (memberId: number) => 
+  api.get<EffectiveTodayAssignment[]>(`/assignments/effective-today/${memberId}`).then(r => r.data);
+export const getEffectiveTodayStats = () => 
+  api.get<EffectiveTodayStats[]>('/assignments/effective-today-stats').then(r => r.data);
 export const createAssignment = (data: { chore_id: number; member_id: number; day_of_week: number }) => 
   api.post<Assignment>('/assignments', data).then(r => r.data);
 export const deleteAssignment = (id: number) => api.delete(`/assignments/${id}`);
