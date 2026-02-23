@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import Markdown from 'react-markdown';
 import {
   Box,
   Text,
@@ -8,34 +7,24 @@ import {
   Paper,
   ActionIcon,
   Center,
-  Loader,
   Group,
   Stack,
   Badge,
   Progress,
   RingProgress,
   SimpleGrid,
-  Tooltip,
   ScrollArea,
-  TextInput,
-  Transition,
 } from '@mantine/core';
 import { 
-  IconSend, 
-  IconRobot,
-  IconUser,
   IconChecklist,
   IconStar,
   IconChefHat,
   IconSun,
   IconMoon,
   IconSunrise,
-  IconMicrophone,
-  IconPlayerStop,
   IconCalendar,
   IconTrophy,
   IconChevronRight,
-  IconSparkles,
 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import * as api from '../api';
@@ -72,60 +61,86 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
       background-size: 200% 100%;
       animation: shimmer 2s infinite;
     }
-    .markdown-content p { margin: 0 0 0.5em 0; }
-    .markdown-content p:last-child { margin-bottom: 0; }
-    .markdown-content ul, .markdown-content ol { margin: 0.5em 0; padding-left: 1.5em; }
-    .markdown-content li { margin: 0.25em 0; }
-    .markdown-content strong { font-weight: 700; }
-    .markdown-content em { font-style: italic; }
-    .markdown-content code { background: #e2e8f0; padding: 0.1em 0.3em; border-radius: 4px; font-size: 0.9em; }
-    .markdown-content h1, .markdown-content h2, .markdown-content h3 { margin: 0.5em 0 0.25em 0; font-weight: 700; }
-    .markdown-content h1 { font-size: 1.25em; }
-    .markdown-content h2 { font-size: 1.1em; }
-    .markdown-content h3 { font-size: 1em; }
   `;
   document.head.appendChild(style);
 }
 
-// TypeScript declarations for Web Speech API
-interface SpeechRecognitionResult {
-  [index: number]: { transcript: string };
-  isFinal: boolean;
-  length: number;
+// --- Laundry Types & Hook ---
+type ApplianceStatus = 'idle' | 'running' | 'done';
+
+interface ApplianceState {
+  status: ApplianceStatus;
+  cycle?: string;
+  timeRemaining?: number; // minutes
 }
 
-interface SpeechRecognitionEvent {
-  results: { [index: number]: SpeechRecognitionResult; length: number };
+interface LaundryState {
+  washer: ApplianceState;
+  dryer: ApplianceState;
 }
 
-interface SpeechRecognitionInstance {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start: () => void;
-  stop: () => void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: any) => void) | null;
-  onend: (() => void) | null;
-  onaudiostart: (() => void) | null;
-  onspeechstart: (() => void) | null;
-  onspeechend: (() => void) | null;
+// TODO: Replace mock data with real Electrolux API integration
+function useLaundry(): LaundryState {
+  return {
+    washer: { status: 'running', cycle: 'Cotton Wash', timeRemaining: 23 },
+    dryer: { status: 'idle' },
+  };
 }
 
-declare global {
-  interface Window {
-    SpeechRecognition: new () => SpeechRecognitionInstance;
-    webkitSpeechRecognition: new () => SpeechRecognitionInstance;
-  }
+// --- Laundry Widget ---
+function ApplianceCard({ icon, name, state }: { icon: string; name: string; state: ApplianceState }) {
+  const statusColor = state.status === 'running' ? 'blue' : state.status === 'done' ? 'green' : 'gray';
+  const statusLabel = state.status === 'running' ? 'Running' : state.status === 'done' ? 'Done' : 'Idle';
+
+  return (
+    <Paper
+      p="md"
+      radius="xl"
+      style={{
+        flex: 1,
+        background: state.status === 'done' ? '#dcfce7' : state.status === 'running' ? '#eff6ff' : '#f8fafc',
+        border: `2px solid ${state.status === 'done' ? '#22c55e' : state.status === 'running' ? '#93c5fd' : '#e2e8f0'}`,
+      }}
+    >
+      <Group gap="md" align="center">
+        <Text style={{ fontSize: '2rem', lineHeight: 1 }}>{icon}</Text>
+        <Box style={{ flex: 1 }}>
+          <Group gap="xs" mb={2}>
+            <Text fw={700} size="sm">{name}</Text>
+            <Badge size="sm" color={statusColor} variant="light">{statusLabel}</Badge>
+          </Group>
+          {state.status === 'running' && state.timeRemaining !== undefined && (
+            <Text size="xs" c="blue.6" fw={600}>{state.cycle} · {state.timeRemaining} min left</Text>
+          )}
+          {state.status === 'done' && (
+            <Text size="xs" c="green.7" fw={600}>Done! Hang it out 👕</Text>
+          )}
+          {state.status === 'idle' && (
+            <Text size="xs" c="dimmed">Not running</Text>
+          )}
+        </Box>
+      </Group>
+    </Paper>
+  );
 }
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
+function LaundryWidget() {
+  const laundry = useLaundry();
+  return (
+    <Paper p="md" radius="xl" shadow="sm" style={{ background: 'white' }}>
+      <Group gap="sm" mb="sm">
+        <Text size="lg">🧺</Text>
+        <Text fw={700} size="md">Laundry</Text>
+      </Group>
+      <Group gap="md" grow>
+        <ApplianceCard icon="🫧" name="Washer" state={laundry.washer} />
+        <ApplianceCard icon="🌀" name="Dryer" state={laundry.dryer} />
+      </Group>
+    </Paper>
+  );
 }
 
+// --- Main Types ---
 interface FamilyMemberStats {
   id: number;
   name: string;
@@ -161,65 +176,9 @@ function getGreeting(): { text: string; icon: typeof IconSun } {
 export default function HomeView() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const pendingVoiceRef = useRef<string | null>(null);
 
   const greeting = getGreeting();
   const GreetingIcon = greeting.icon;
-
-  // Initialize speech recognition
-  useEffect(() => {
-    const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognitionClass) {
-      const recognition = new SpeechRecognitionClass();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = 'en-AU';
-      
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        const result = event.results[event.results.length - 1];
-        const text = result[0].transcript;
-        setTranscript(text);
-        
-        if (result.isFinal) {
-          pendingVoiceRef.current = text;
-          setInput(text);
-          setIsListening(false);
-        }
-      };
-      
-      recognition.onerror = () => {
-        setIsListening(false);
-        setTranscript('');
-      };
-      
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-      
-      recognitionRef.current = recognition;
-    }
-    
-    // Cleanup on unmount
-    return () => {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch { /* ignore */ }
-      }
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -232,9 +191,8 @@ export default function HomeView() {
 
       const today = dayjs().day();
       
-      // Use effective today stats (includes rollover chores from earlier this week)
       const familyStats: FamilyMemberStats[] = effectiveStats.map(stat => {
-        const member = kioskData.members.find(m => m.id === stat.member_id);
+        const member = kioskData.members.find((m: any) => m.id === stat.member_id);
         return {
           id: stat.member_id,
           name: stat.name,
@@ -271,125 +229,11 @@ export default function HomeView() {
     return () => clearInterval(interval);
   }, [loadData]);
 
-  // Scroll chat to bottom
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-    }
-  }, [messages]);
-
-  // Handle voice auto-send
-  useEffect(() => {
-    if (pendingVoiceRef.current && !sending && !isListening) {
-      const text = pendingVoiceRef.current;
-      pendingVoiceRef.current = null;
-      setTimeout(() => sendMessage(text), 300);
-    }
-  }, [sending, isListening]);
-
-  const speak = useCallback((text: string) => {
-    if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const cleanText = text.replace(/\*\*/g, '').replace(/[#*_~`]/g, '').replace(/[\u{1F300}-\u{1F9FF}]/gu, '');
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 1.0;
-    const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(v => v.lang.startsWith('en-AU')) || voices.find(v => v.lang.startsWith('en'));
-    if (preferred) utterance.voice = preferred;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
-  }, []);
-
-  const stopSpeaking = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    window.speechSynthesis.cancel();
-    setIsSpeaking(false);
-  };
-
-  const toggleListening = () => {
-    if (!recognitionRef.current) return;
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      setTranscript('');
-      setIsListening(true);
-      setChatOpen(true);
-      recognitionRef.current.start();
-    }
-  };
-
-  const sendMessage = async (text: string) => {
-    if (!text.trim() || sending) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: text.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setTranscript('');
-    setSending(true);
-
-    try {
-      const recentHistory = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
-      
-      const response = await fetch('/api/chat/v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage.content, voice: true, history: recentHistory }),
-      });
-
-      const result = await response.json();
-      const replyText = result.reply || "I'm here to help!";
-
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: replyText,
-        timestamp: new Date(),
-      }]);
-      
-      if (result.actionPerformed) {
-        celebrateCompletion();
-        playSuccess();
-        loadData();
-      }
-      
-      if (result.audioUrl) {
-        setIsSpeaking(true);
-        const audio = new Audio(result.audioUrl);
-        audioRef.current = audio;
-        audio.onended = () => setIsSpeaking(false);
-        audio.onerror = () => { setIsSpeaking(false); speak(replyText); };
-        audio.play().catch(() => { setIsSpeaking(false); speak(replyText); });
-      } else {
-        speak(replyText);
-      }
-    } catch {
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: "Sorry, something went wrong!",
-        timestamp: new Date(),
-      }]);
-    } finally {
-      setSending(false);
-    }
-  };
-
   if (loading) {
     return (
       <Center h="100%">
         <Stack align="center" gap="md">
-          <Loader size="xl" color="orange" />
+          <Text size="xl">⏳</Text>
           <Text c="dimmed">Loading dashboard...</Text>
         </Stack>
       </Center>
@@ -688,160 +532,8 @@ export default function HomeView() {
         </Box>
       </Box>
 
-      {/* Bottom Assistant Bar */}
-      <Paper
-        p="md"
-        radius="xl"
-        shadow="md"
-        style={{
-          background: chatOpen ? 'white' : 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
-          border: chatOpen ? '2px solid #e9ecef' : 'none',
-          transition: 'all 0.3s',
-        }}
-      >
-        {chatOpen ? (
-          <Box>
-            {/* Chat Messages */}
-            <ScrollArea h={200} viewportRef={scrollRef} mb="md">
-              <Stack gap="sm">
-                {messages.length === 0 && (
-                  <Center py="md">
-                    <Group gap="sm">
-                      <IconSparkles size={20} color="#f97316" />
-                      <Text c="dimmed">Ask me about chores, dinner, or stars!</Text>
-                    </Group>
-                  </Center>
-                )}
-                {messages.map(msg => (
-                  <Box
-                    key={msg.id}
-                    style={{
-                      display: 'flex',
-                      justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                    }}
-                  >
-                    <Paper
-                      p="sm"
-                      radius="lg"
-                      maw="80%"
-                      style={{
-                        background: msg.role === 'user' 
-                          ? 'linear-gradient(135deg, #3b82f6, #06b6d4)' 
-                          : '#f1f5f9',
-                      }}
-                      className={msg.role === 'assistant' ? 'assistant-message' : ''}
-                    >
-                      {msg.role === 'user' ? (
-                        <Text c="white" size="sm">{msg.content}</Text>
-                      ) : (
-                        <Box className="markdown-content" style={{ fontSize: '0.875rem', color: '#1a1a1a' }}>
-                          <Markdown>{msg.content}</Markdown>
-                        </Box>
-                      )}
-                    </Paper>
-                  </Box>
-                ))}
-                {sending && (
-                  <Group gap="xs">
-                    <Loader size="xs" color="orange" />
-                    <Text size="sm" c="dimmed">Thinking...</Text>
-                  </Group>
-                )}
-              </Stack>
-            </ScrollArea>
-            
-            {/* Input Area */}
-            <Group gap="sm">
-              <ActionIcon
-                size={44}
-                radius="xl"
-                color={isListening ? 'red' : isSpeaking ? 'green' : 'orange'}
-                variant="filled"
-                onClick={isSpeaking ? stopSpeaking : toggleListening}
-              >
-                {isSpeaking ? <IconPlayerStop size={22} /> : <IconMicrophone size={22} />}
-              </ActionIcon>
-              <TextInput
-                placeholder={isListening ? transcript || 'Listening...' : 'Type a message...'}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)}
-                disabled={sending || isListening}
-                style={{ flex: 1 }}
-                radius="xl"
-                size="md"
-              />
-              <ActionIcon
-                size={44}
-                radius="xl"
-                color="blue"
-                variant="filled"
-                onClick={() => sendMessage(input)}
-                disabled={!input.trim() || sending}
-              >
-                <IconSend size={20} />
-              </ActionIcon>
-              <ActionIcon
-                size={44}
-                radius="xl"
-                variant="light"
-                color="gray"
-                onClick={() => setChatOpen(false)}
-              >
-                ✕
-              </ActionIcon>
-            </Group>
-          </Box>
-        ) : (
-          <Group justify="space-between" align="center">
-            <Group gap="md">
-              <Box
-                className="glow-animation"
-                style={{
-                  width: 50,
-                  height: 50,
-                  borderRadius: '50%',
-                  background: 'rgba(255,255,255,0.2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <IconRobot size={28} color="white" />
-              </Box>
-              <Box>
-                <Text c="white" fw={700}>Family Assistant</Text>
-                <Text c="white" size="sm" style={{ opacity: 0.8 }}>
-                  Tap to ask me anything!
-                </Text>
-              </Box>
-            </Group>
-            
-            <Group gap="sm">
-              <Tooltip label="Voice command">
-                <ActionIcon
-                  size={50}
-                  radius="xl"
-                  variant="white"
-                  color="dark"
-                  onClick={toggleListening}
-                >
-                  <IconMicrophone size={24} />
-                </ActionIcon>
-              </Tooltip>
-              <ActionIcon
-                size={50}
-                radius="xl"
-                variant="white"
-                color="dark"
-                onClick={() => setChatOpen(true)}
-              >
-                <IconChevronRight size={24} />
-              </ActionIcon>
-            </Group>
-          </Group>
-        )}
-      </Paper>
+      {/* Laundry Status Widget */}
+      <LaundryWidget />
     </Box>
   );
 }
