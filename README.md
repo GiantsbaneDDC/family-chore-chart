@@ -52,9 +52,14 @@ A fun, gamified chore management app for families. Kids earn stars for completin
 - Tap to wake
 - Perfect for wall-mounted tablets
 
-### 🤖 AI Assistant
-- Voice-enabled assistant integration
-- Natural language interaction
+### 🫧 Smart Laundry Integration
+- Live washer & dryer status on the home screen via [Electrolux One API](https://developer.electrolux.one/)
+- Tap either appliance for a full detail page: current cycle, phase, temp, spin speed, door state
+- Progress ring with time remaining countdown
+- Usage history chart (cycles per day, last 30 days)
+- Cycle completion logging to PostgreSQL with duration tracking
+- Auto-refreshes every 60s, handles rotating OAuth tokens automatically
+- Works with Electrolux, AEG, Frigidaire and other Electrolux Group brands
 
 ## 🛠️ Tech Stack
 
@@ -64,6 +69,7 @@ A fun, gamified chore management app for families. Kids earn stars for completin
 - **Backend:** Express.js
 - **Database:** PostgreSQL with [Prisma](https://prisma.io/) ORM
 - **Weather:** Open-Meteo API (free, no key required)
+- **Laundry:** Electrolux Group One API (optional, requires account)
 
 ## 🚀 Installation
 
@@ -184,6 +190,36 @@ Open **http://localhost:8080** (or your server's IP)
 | Rewards | Recipes |
 |:---:|:---:|
 | ![Admin Rewards](screenshots/admin-rewards.png) | ![Admin Recipes](screenshots/admin-recipes.png) |
+
+## 🫧 Laundry Integration Setup (Optional)
+
+The app integrates with **Electrolux Group smart appliances** (Electrolux, AEG, Frigidaire etc.) to show live washer/dryer status.
+
+### Setup
+
+1. Register at [developer.electrolux.one](https://developer.electrolux.one/) using your Electrolux app account
+2. Go to **Dashboard → Create New API Key**
+3. Click **Generate Token** to get your Access Token and Refresh Token
+4. Add to `server/.env`:
+
+```env
+ELECTROLUX_API_KEY=a_your-api-key-here
+ELECTROLUX_ACCESS_TOKEN=eyJ...your-access-token
+ELECTROLUX_REFRESH_TOKEN=your-refresh-token
+ELECTROLUX_WASHER_ID=your-washer-appliance-id
+ELECTROLUX_DRYER_ID=your-dryer-appliance-id
+```
+
+5. Find your appliance IDs by calling:
+```bash
+curl https://api.developer.electrolux.one/api/v1/appliances \
+  -H "x-api-key: YOUR_KEY" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+The app handles token rotation automatically — refresh tokens are updated in `.env` whenever they rotate.
+
+> ⚠️ **Note:** Refresh tokens rotate on each use. If you invalidate your tokens by using them multiple times simultaneously, regenerate from the developer portal.
 
 ## 📁 Project Structure
 
