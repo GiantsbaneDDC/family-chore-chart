@@ -79,12 +79,41 @@ interface LaundryState {
   dryer: ApplianceState;
 }
 
-// TODO: Replace mock data with real Electrolux API integration
 function useLaundry(): LaundryState {
-  return {
-    washer: { status: 'running', cycle: 'Cotton Wash', timeRemaining: 23 },
+  const [laundry, setLaundry] = useState<LaundryState>({
+    washer: { status: 'idle' },
     dryer: { status: 'idle' },
-  };
+  });
+
+  useEffect(() => {
+    const fetchLaundry = async () => {
+      try {
+        const res = await fetch('/api/laundry');
+        if (!res.ok) return;
+        const data = await res.json();
+        setLaundry({
+          washer: {
+            status: data.washer?.status || 'idle',
+            cycle: data.washer?.program || data.washer?.cyclePhase || undefined,
+            timeRemaining: data.washer?.timeRemaining || undefined,
+          },
+          dryer: {
+            status: data.dryer?.status || 'idle',
+            cycle: data.dryer?.program || data.dryer?.cyclePhase || undefined,
+            timeRemaining: data.dryer?.timeRemaining || undefined,
+          },
+        });
+      } catch {
+        // silently fail — laundry widget just shows idle
+      }
+    };
+
+    fetchLaundry();
+    const interval = setInterval(fetchLaundry, 30000); // refresh every 30s
+    return () => clearInterval(interval);
+  }, []);
+
+  return laundry;
 }
 
 // --- Laundry Widget ---

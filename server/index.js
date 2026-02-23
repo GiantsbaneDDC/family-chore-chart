@@ -7,7 +7,7 @@ const https = require('https');
 const http = require('http');
 const fs = require('fs');
 const { Pool } = require('pg');
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 const app = express();
 
@@ -3313,6 +3313,29 @@ async function updateFitnessStreak(memberId) {
 
 // Serve audio files from /tmp
 app.use('/audio', express.static('/tmp'));
+
+// ─── Electrolux Laundry API ─────────────────────────────────────────────────
+const { getLaundryStatus } = require('./electrolux');
+
+let laundryCache = null;
+
+async function pollLaundry() {
+  try {
+    laundryCache = await getLaundryStatus();
+    console.log('[Electrolux] Polled OK:', laundryCache.washer.status, '/', laundryCache.dryer.status);
+  } catch (err) {
+    console.error('[Electrolux] Poll error:', err.message);
+  }
+}
+
+// Poll immediately on startup, then every 60s
+pollLaundry();
+setInterval(pollLaundry, 60000);
+
+app.get('/api/laundry', (req, res) => {
+  if (!laundryCache) return res.json({ washer: { status: 'idle' }, dryer: { status: 'idle' }, loading: true });
+  res.json(laundryCache);
+});
 
 // Serve static files from dist
 app.use(express.static(distPath));
