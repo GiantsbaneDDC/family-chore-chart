@@ -117,7 +117,7 @@ function useLaundry(): LaundryState {
 }
 
 // --- Laundry Widget ---
-function ApplianceCard({ icon, name, state }: { icon: string; name: string; state: ApplianceState }) {
+function ApplianceCard({ icon, name, state, href }: { icon: string; name: string; state: ApplianceState; href: string }) {
   const statusColor = state.status === 'running' ? 'blue' : state.status === 'done' ? 'green' : 'gray';
   const statusLabel = state.status === 'running' ? 'Running' : state.status === 'done' ? 'Done' : 'Idle';
 
@@ -125,10 +125,14 @@ function ApplianceCard({ icon, name, state }: { icon: string; name: string; stat
     <Paper
       p="md"
       radius="xl"
+      component={Link}
+      to={href}
       style={{
         flex: 1,
         background: state.status === 'done' ? '#dcfce7' : state.status === 'running' ? '#eff6ff' : '#f8fafc',
         border: `2px solid ${state.status === 'done' ? '#22c55e' : state.status === 'running' ? '#93c5fd' : '#e2e8f0'}`,
+        textDecoration: 'none',
+        transition: 'all 0.15s',
       }}
     >
       <Group gap="md" align="center">
@@ -148,6 +152,7 @@ function ApplianceCard({ icon, name, state }: { icon: string; name: string; stat
             <Text size="xs" c="dimmed">Not running</Text>
           )}
         </Box>
+        <IconChevronRight size={16} color="#94a3b8" />
       </Group>
     </Paper>
   );
@@ -162,8 +167,8 @@ function LaundryWidget() {
         <Text fw={700} size="md">Laundry</Text>
       </Group>
       <Group gap="md" grow>
-        <ApplianceCard icon="🫧" name="Washer" state={laundry.washer} />
-        <ApplianceCard icon="🌀" name="Dryer" state={laundry.dryer} />
+        <ApplianceCard icon="🫧" name="Washer" state={laundry.washer} href="/appliance/washer" />
+        <ApplianceCard icon="🌀" name="Dryer" state={laundry.dryer} href="/appliance/dryer" />
       </Group>
     </Paper>
   );

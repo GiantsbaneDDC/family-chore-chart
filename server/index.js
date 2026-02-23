@@ -3318,11 +3318,46 @@ app.use('/audio', express.static('/tmp'));
 const { getLaundryStatus } = require('./electrolux');
 
 let laundryCache = null;
+const laundryPrevStatus = { WM: null, TD: null };
+const laundryRunStart = { WM: null, TD: null };
+
+async function logCycleCompletion(type, prev, curr) {
+  try {
+    const name = type === 'WM' ? 'Washing machine' : 'Dryer';
+    const started = laundryRunStart[type];
+    const durationMin = started ? Math.round((Date.now() - started) / 60000) : null;
+    await pool.query(
+      `INSERT INTO laundry_cycles (appliance_type, appliance_name, program, cycle_phase, started_at, completed_at, duration_minutes, temperature, spin_speed, total_cycles_at_log)
+       VALUES ($1,$2,$3,$4,$5,NOW(),$6,$7,$8,$9)`,
+      [type, name, prev.program, prev.cyclePhase, started ? new Date(started).toISOString() : null,
+       durationMin, prev.temperature || null, prev.spinSpeed || null, curr.totalCycles || null]
+    );
+    console.log(`[Electrolux] Logged completed ${name} cycle: ${prev.program}`);
+  } catch (err) {
+    console.error('[Electrolux] Failed to log cycle:', err.message);
+  }
+}
 
 async function pollLaundry() {
   try {
-    laundryCache = await getLaundryStatus();
-    console.log('[Electrolux] Polled OK:', laundryCache.washer.status, '/', laundryCache.dryer.status);
+    const data = await getLaundryStatus();
+
+    // Detect cycle completions
+    for (const [type, key] of [['WM', 'washer'], ['TD', 'dryer']]) {
+      const curr = data[key];
+      const prev = laundryPrevStatus[type];
+      if (curr.status === 'running' && !laundryRunStart[type]) {
+        laundryRunStart[type] = Date.now();
+      }
+      if (prev && prev.status === 'running' && curr.status !== 'running') {
+        await logCycleCompletion(type, prev, curr);
+        laundryRunStart[type] = null;
+      }
+      laundryPrevStatus[type] = curr;
+    }
+
+    laundryCache = data;
+    console.log('[Electrolux] Polled OK:', data.washer.status, '/', data.dryer.status);
   } catch (err) {
     console.error('[Electrolux] Poll error:', err.message);
   }
@@ -3335,6 +3370,26 @@ setInterval(pollLaundry, 60000);
 app.get('/api/laundry', (req, res) => {
   if (!laundryCache) return res.json({ washer: { status: 'idle' }, dryer: { status: 'idle' }, loading: true });
   res.json(laundryCache);
+});
+
+app.get('/api/laundry/history/:type', async (req, res) => {
+  try {
+    const type = req.params.type.toUpperCase(); // WM or TD
+    const rows = await pool.query(
+      `SELECT * FROM laundry_cycles WHERE appliance_type=$1 ORDER BY completed_at DESC LIMIT 30`,
+      [type]
+    );
+    // Also return weekly/monthly counts
+    const weekly = await pool.query(
+      `SELECT DATE_TRUNC('day', completed_at AT TIME ZONE 'Australia/Sydney') as day, COUNT(*) as cycles
+       FROM laundry_cycles WHERE appliance_type=$1 AND completed_at > NOW() - INTERVAL '30 days'
+       GROUP BY day ORDER BY day`,
+      [type]
+    );
+    res.json({ cycles: rows.rows, weekly: weekly.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Serve static files from dist

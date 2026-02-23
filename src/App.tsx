@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import ApplianceDetailView from './views/ApplianceDetailView';
 import HomeView from './views/HomeView';
 import KioskView from './views/KioskView';
 import KidView from './views/KidView';
@@ -31,6 +32,7 @@ function AppRoutes() {
       <Route path="/calendar" element={<CalendarView />} />
       <Route path="/weather" element={<WeatherView />} />
       <Route path="/fitness" element={<FitnessView />} />
+      <Route path="/appliance/:type" element={<ApplianceDetailView />} />
     </Routes>
   );
 }
