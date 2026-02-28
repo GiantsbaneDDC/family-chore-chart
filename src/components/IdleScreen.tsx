@@ -90,17 +90,16 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
     .robot-eyes { animation: robotBlink 4s ease-in-out infinite; }
     .robot-body { animation: robotBounce 3s ease-in-out infinite; }
     .star-twinkle { animation: starTwinkle 2s ease-in-out infinite; }
-    @keyframes photoFadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
+    @keyframes photoKenBurnsA {
+      0%   { transform: scale(1)    translate(0,    0);    }
+      100% { transform: scale(1.08) translate(-1.5%, -1%); }
     }
-    @keyframes photoKenBurns {
-      0% { transform: scale(1) translate(0, 0); }
-      50% { transform: scale(1.06) translate(-1%, -1%); }
-      100% { transform: scale(1.03) translate(1%, 0.5%); }
+    @keyframes photoKenBurnsB {
+      0%   { transform: scale(1.05) translate(1%,  0.5%); }
+      100% { transform: scale(1)    translate(-0.5%, 1%);  }
     }
-    .photo-fade-in { animation: photoFadeIn 1.5s ease-in-out forwards; }
-    .photo-ken-burns { animation: photoKenBurns 15s ease-in-out infinite; }
+    .photo-ken-burns-a { animation: photoKenBurnsA 18s ease-in-out forwards; }
+    .photo-ken-burns-b { animation: photoKenBurnsB 18s ease-in-out forwards; }
   `;
   document.head.appendChild(style);
 }
@@ -148,11 +147,19 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
   const [todayDinner, setTodayDinner] = useState<{ title: string; icon: string } | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
 
-  // Google Photos slideshow
+  // Google Photos slideshow — A/B layer crossfade, preloaded
+  const PHOTO_INTERVAL = 15000; // ms per photo
+  const CROSSFADE_MS   = 1500;  // ms for opacity transition
+
   const [photos, setPhotos] = useState<GPhoto[]>([]);
-  const [photoIndex, setPhotoIndex] = useState(0);
-  const [photoKey, setPhotoKey] = useState(0); // forces re-mount for fade animation
-  const PHOTO_INTERVAL = 15000; // 15 seconds per photo
+  const photosRef = useRef<GPhoto[]>([]);
+  const indexRef  = useRef(0);
+
+  // Two layers: A and B, always in DOM, we flip opacity between them
+  const [layerA, setLayerA] = useState<{ url: string; kenClass: string } | null>(null);
+  const [layerB, setLayerB] = useState<{ url: string; kenClass: string } | null>(null);
+  const [activeLayer, setActiveLayer] = useState<'A' | 'B'>('A'); // which layer is visible
+  const [displayIndex, setDisplayIndex] = useState(0); // for progress dots + caption
 
   // Pixel shift to prevent screen burn-in
   const [pixelShift, setPixelShift] = useState({ x: 0, y: 0 });
@@ -204,29 +211,61 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch Google Photos
+  // Preload an image, resolve with its URL once loaded
+  const preload = (url: string): Promise<string> =>
+    new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => resolve(url);
+      img.onerror = () => resolve(url); // show it anyway on error
+      img.src = url;
+    });
+
+  // Show a photo in the inactive layer then fade it in
+  const transitionTo = useCallback(async (url: string, showInLayer: 'A' | 'B', newIndex: number) => {
+    const kenClass = showInLayer === 'A' ? 'photo-ken-burns-a' : 'photo-ken-burns-b';
+    await preload(url);
+    if (showInLayer === 'A') setLayerA({ url, kenClass });
+    else                     setLayerB({ url, kenClass });
+    setActiveLayer(showInLayer);
+    setDisplayIndex(newIndex);
+  }, []);
+
+  // Fetch photos, shuffle client-side, show first one
   useEffect(() => {
     fetch('/api/photos')
       .then(r => r.json())
-      .then(data => {
-        if (data.photos && data.photos.length > 0) {
-          setPhotos(data.photos);
-          setPhotoIndex(0);
-          setPhotoKey(k => k + 1);
-        }
+      .then(async data => {
+        if (!data.photos || data.photos.length === 0) return;
+        // Client-side shuffle for variety on each idle session
+        const shuffled = [...data.photos].sort(() => Math.random() - 0.5);
+        photosRef.current = shuffled;
+        setPhotos(shuffled);
+        indexRef.current = 0;
+        // Load first photo into layer A
+        await transitionTo(shuffled[0].url, 'A', 0);
+        // Preload second into layer B (ready to go)
+        if (shuffled.length > 1) preload(shuffled[1].url);
       })
       .catch(err => console.warn('[IdleScreen] Could not fetch photos:', err));
   }, []);
 
-  // Cycle through photos
+  // Cycle photos every PHOTO_INTERVAL
   useEffect(() => {
     if (photos.length === 0) return;
-    const interval = setInterval(() => {
-      setPhotoIndex(i => (i + 1) % photos.length);
-      setPhotoKey(k => k + 1);
+    const interval = setInterval(async () => {
+      const list = photosRef.current;
+      if (list.length === 0) return;
+      const nextIndex = (indexRef.current + 1) % list.length;
+      indexRef.current = nextIndex;
+      const nextUrl  = list[nextIndex].url;
+      const showIn   = activeLayer === 'A' ? 'B' : 'A'; // flip to inactive layer
+      await transitionTo(nextUrl, showIn, nextIndex);
+      // Preload the one after next
+      const preloadIndex = (nextIndex + 1) % list.length;
+      preload(list[preloadIndex].url);
     }, PHOTO_INTERVAL);
     return () => clearInterval(interval);
-  }, [photos]);
+  }, [photos, activeLayer, transitionTo]);
 
   // Fetch data
   useEffect(() => {
@@ -330,7 +369,45 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
 
   const isNight = time.hour() >= 20 || time.hour() < 6;
 
-  const currentPhoto = photos.length > 0 ? photos[photoIndex] : null;
+  const hasPhotos = layerA !== null || layerB !== null;
+  const currentDesc = photos[displayIndex]?.description || '';
+
+  // Helper to render one photo layer
+  const renderLayer = (layer: { url: string; kenClass: string } | null, name: 'A' | 'B') => {
+    if (!layer) return null;
+    const isActive = activeLayer === name;
+    return (
+      <Box
+        key={`layer-${name}`}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 0,
+          overflow: 'hidden',
+          opacity: isActive ? 1 : 0,
+          transition: `opacity ${CROSSFADE_MS}ms ease-in-out`,
+          pointerEvents: 'none',
+        }}
+      >
+        <Box
+          className={layer.kenClass}
+          style={{
+            position: 'absolute',
+            inset: '-6%',
+            backgroundImage: `url(${layer.url})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        />
+        {/* Gradient overlay for readability */}
+        <Box style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.5) 100%)',
+        }} />
+      </Box>
+    );
+  };
 
   return (
     <Box
@@ -345,43 +422,14 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
           ? 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)'
           : 'linear-gradient(135deg, #7c3aed 0%, #6366f1 25%, #3b82f6 50%, #06b6d4 75%, #10b981 100%)',
       }}
-      className={currentPhoto ? undefined : 'idle-gradient'}
+      className={hasPhotos ? undefined : 'idle-gradient'}
     >
-      {/* Google Photos background slideshow */}
-      {currentPhoto && (
-        <Box
-          key={photoKey}
-          className="photo-fade-in"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            zIndex: 0,
-            overflow: 'hidden',
-          }}
-        >
-          <Box
-            className="photo-ken-burns"
-            style={{
-              position: 'absolute',
-              inset: '-5%', // slight overscan for ken-burns movement
-              backgroundImage: `url(${currentPhoto.url})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            }}
-          />
-          {/* Dark overlay for readability */}
-          <Box
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0.55) 100%)',
-            }}
-          />
-        </Box>
-      )}
+      {/* A/B photo layers — always mounted, crossfade via opacity */}
+      {renderLayer(layerA, 'A')}
+      {renderLayer(layerB, 'B')}
 
       {/* Twinkling Stars (night) or Floating particles (day) — only when no photo */}
-      {!currentPhoto && stars.map(star => (
+      {!hasPhotos && stars.map(star => (
         <Box
           key={star.id}
           className="star-twinkle"
@@ -400,7 +448,7 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
       ))}
 
       {/* Floating Emojis — only when no photo */}
-      {!currentPhoto && floatingEmojis.map(item => (
+      {!hasPhotos && floatingEmojis.map(item => (
         <Text
           key={item.id}
           className="idle-float-slow"
@@ -436,7 +484,7 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
         }}
       >
         {/* Animated Robot Mascot — hidden during photo slideshow */}
-        <Box className="robot-body" style={{ marginBottom: 20, display: currentPhoto ? 'none' : undefined }}>
+        <Box className="robot-body" style={{ marginBottom: 20, display: hasPhotos ? 'none' : undefined }}>
           <Box
             style={{
               width: 120,
@@ -607,16 +655,16 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
         {/* Photo slideshow indicator */}
         {photos.length > 1 && (
           <Box mt={16} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            {/* Progress dots */}
+            {/* Progress dots — max 20 shown */}
             <Box style={{ display: 'flex', gap: 6 }}>
-              {photos.slice(0, Math.min(photos.length, 20)).map((_, i) => (
+              {Array.from({ length: Math.min(photos.length, 20) }).map((_, i) => (
                 <Box
                   key={i}
                   style={{
-                    width: i === photoIndex % Math.min(photos.length, 20) ? 20 : 6,
+                    width: i === displayIndex % Math.min(photos.length, 20) ? 20 : 6,
                     height: 6,
                     borderRadius: 3,
-                    background: i === photoIndex % Math.min(photos.length, 20)
+                    background: i === displayIndex % Math.min(photos.length, 20)
                       ? 'rgba(255,255,255,0.95)'
                       : 'rgba(255,255,255,0.3)',
                     transition: 'all 0.4s ease',
@@ -624,10 +672,10 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
                 />
               ))}
             </Box>
-            {/* Photo caption */}
-            {currentPhoto?.description && (
+            {/* Caption */}
+            {currentDesc && (
               <Text c="white" size="xs" style={{ opacity: 0.6, textAlign: 'center', maxWidth: 400 }}>
-                {currentPhoto.description}
+                {currentDesc}
               </Text>
             )}
           </Box>
