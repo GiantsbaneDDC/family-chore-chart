@@ -161,35 +161,35 @@ Open **http://localhost:8080** (or your server's IP)
 
 | Home | Chores | Fitness |
 |:---:|:---:|:---:|
-| ![Home](screenshots/home.png) | ![Chores](screenshots/chores.png) | ![Fitness](screenshots/fitness.png) |
+| ![Home](screenshots/home.png?v=2) | ![Chores](screenshots/chores.png?v=2) | ![Fitness](screenshots/fitness.png?v=2) |
 
 | Weather | Dinner Plan | Rewards |
 |:---:|:---:|:---:|
-| ![Weather](screenshots/weather.png) | ![Dinner Plan](screenshots/dinner-plan.png) | ![Rewards](screenshots/rewards.png) |
+| ![Weather](screenshots/weather.png?v=2) | ![Dinner Plan](screenshots/dinner-plan.png?v=2) | ![Rewards](screenshots/rewards.png?v=2) |
 
 | Calendar | Recipe |
 |:---:|:---:|
-| ![Calendar](screenshots/calendar.png) | ![Recipe](screenshots/recipe.png) |
+| ![Calendar](screenshots/calendar.png?v=2) | ![Recipe](screenshots/recipe.png?v=2) |
 
 ### Kiosk Mode (POS-Style Pickers)
 
 | Member Select | Chore Picker |
 |:---:|:---:|
-| ![Member Select](screenshots/kiosk-member-select.png) | ![Chore Picker](screenshots/kiosk-chore-picker.png) |
+| ![Member Select](screenshots/kiosk-member-select.png?v=2) | ![Chore Picker](screenshots/kiosk-chore-picker.png?v=2) |
 
 | Fitness - Select Member | Fitness - Activity Picker |
 |:---:|:---:|
-| ![Fitness Member](screenshots/fitness-member-select.png) | ![Activity Picker](screenshots/fitness-activity-picker.png) |
+| ![Fitness Member](screenshots/fitness-member-select.png?v=2) | ![Activity Picker](screenshots/fitness-activity-picker.png?v=2) |
 
 ### Admin Panel
 
 | Members | Chores | Activities |
 |:---:|:---:|:---:|
-| ![Admin Members](screenshots/admin-members.png) | ![Admin Chores](screenshots/admin-chores.png) | ![Admin Activities](screenshots/admin-activities.png) |
+| ![Admin Members](screenshots/admin-members.png?v=2) | ![Admin Chores](screenshots/admin-chores.png?v=2) | ![Admin Activities](screenshots/admin-activities.png?v=2) |
 
 | Rewards | Recipes |
 |:---:|:---:|
-| ![Admin Rewards](screenshots/admin-rewards.png) | ![Admin Recipes](screenshots/admin-recipes.png) |
+| ![Admin Rewards](screenshots/admin-rewards.png?v=2) | ![Admin Recipes](screenshots/admin-recipes.png?v=2) |
 
 ## 🫧 Laundry Integration Setup (Optional)
 
