@@ -3392,6 +3392,158 @@ app.get('/api/laundry/history/:type', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────
+// Google Photos API
+// ─────────────────────────────────────────────
+
+// Simple in-memory cache
+let photosCache = { urls: [], fetchedAt: 0 };
+const PHOTOS_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+async function getGooglePhotosAccessToken() {
+  const clientId = process.env.GOOGLE_PHOTOS_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_PHOTOS_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_PHOTOS_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('Google Photos not configured. Run: node server/setup-photos-auth.js');
+  }
+
+  return new Promise((resolve, reject) => {
+    const body = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }).toString();
+
+    const req = https.request({
+      hostname: 'oauth2.googleapis.com',
+      path: '/token',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', () => {
+        const parsed = JSON.parse(data);
+        if (parsed.error) return reject(new Error(parsed.error_description || parsed.error));
+        resolve(parsed.access_token);
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+async function fetchGooglePhotos(accessToken) {
+  const albumId = process.env.GOOGLE_PHOTOS_ALBUM_ID;
+  const pageSize = 50;
+
+  return new Promise((resolve, reject) => {
+    let path, body;
+
+    if (!albumId || albumId === '_all') {
+      // Fetch recent photos from library
+      path = `/v1/mediaItems?pageSize=${pageSize}&filters={}`;
+      const makeRequest = () => {
+        const req = https.request({
+          hostname: 'photoslibrary.googleapis.com',
+          path: `/v1/mediaItems?pageSize=${pageSize}`,
+          method: 'GET',
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }, (res) => {
+          let data = '';
+          res.on('data', d => data += d);
+          res.on('end', () => {
+            const parsed = JSON.parse(data);
+            if (parsed.error) return reject(new Error(parsed.error.message));
+            const photos = (parsed.mediaItems || [])
+              .filter(item => item.mimeType && item.mimeType.startsWith('image/'))
+              .map(item => ({
+                id: item.id,
+                url: `${item.baseUrl}=w1920-h1080-c`, // crop-fill at 1920×1080
+                description: item.description || item.filename || '',
+              }));
+            resolve(photos);
+          });
+        });
+        req.on('error', reject);
+        req.end();
+      };
+      makeRequest();
+    } else {
+      // Fetch photos from specific album
+      body = JSON.stringify({ albumId, pageSize });
+      const req = https.request({
+        hostname: 'photoslibrary.googleapis.com',
+        path: '/v1/mediaItems:search',
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      }, (res) => {
+        let data = '';
+        res.on('data', d => data += d);
+        res.on('end', () => {
+          const parsed = JSON.parse(data);
+          if (parsed.error) return reject(new Error(parsed.error.message));
+          const photos = (parsed.mediaItems || [])
+            .filter(item => item.mimeType && item.mimeType.startsWith('image/'))
+            .map(item => ({
+              id: item.id,
+              url: `${item.baseUrl}=w1920-h1080-c`,
+              description: item.description || item.filename || '',
+            }));
+          resolve(photos);
+        });
+      });
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    }
+  });
+}
+
+app.get('/api/photos', async (req, res) => {
+  try {
+    const now = Date.now();
+
+    // Return cached if still fresh
+    if (photosCache.urls.length > 0 && now - photosCache.fetchedAt < PHOTOS_CACHE_TTL) {
+      return res.json({ photos: photosCache.urls, cached: true });
+    }
+
+    const accessToken = await getGooglePhotosAccessToken();
+    const photos = await fetchGooglePhotos(accessToken);
+
+    // Shuffle for variety
+    for (let i = photos.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [photos[i], photos[j]] = [photos[j], photos[i]];
+    }
+
+    photosCache = { urls: photos, fetchedAt: now };
+    res.json({ photos });
+  } catch (err) {
+    console.error('[Photos API]', err.message);
+    // Return empty so the idle screen gracefully falls back to its default UI
+    res.json({ photos: [], error: err.message });
+  }
+});
+
+// Invalidate photo cache (e.g. after album change)
+app.post('/api/photos/refresh', (req, res) => {
+  photosCache = { urls: [], fetchedAt: 0 };
+  res.json({ ok: true });
+});
+
 // Serve static files from dist
 app.use(express.static(distPath));
 

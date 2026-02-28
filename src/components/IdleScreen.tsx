@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Box, Text, Title, Group, Stack, Paper } from '@mantine/core';
+import { Box, Text, Title, Group, Paper } from '@mantine/core';
 import { Avatar } from './Avatar';
 import { 
   IconSunFilled, 
@@ -90,6 +90,17 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
     .robot-eyes { animation: robotBlink 4s ease-in-out infinite; }
     .robot-body { animation: robotBounce 3s ease-in-out infinite; }
     .star-twinkle { animation: starTwinkle 2s ease-in-out infinite; }
+    @keyframes photoFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes photoKenBurns {
+      0% { transform: scale(1) translate(0, 0); }
+      50% { transform: scale(1.06) translate(-1%, -1%); }
+      100% { transform: scale(1.03) translate(1%, 0.5%); }
+    }
+    .photo-fade-in { animation: photoFadeIn 1.5s ease-in-out forwards; }
+    .photo-ken-burns { animation: photoKenBurns 15s ease-in-out infinite; }
   `;
   document.head.appendChild(style);
 }
@@ -119,6 +130,12 @@ interface CalendarEvent {
   allDay: boolean;
 }
 
+interface GPhoto {
+  id: string;
+  url: string;
+  description: string;
+}
+
 interface IdleScreenProps {
   onWake: () => void;
   familyAvatars?: string[];
@@ -130,7 +147,13 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
   const [forecast, setForecast] = useState<ForecastDay[]>([]);
   const [todayDinner, setTodayDinner] = useState<{ title: string; icon: string } | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  
+
+  // Google Photos slideshow
+  const [photos, setPhotos] = useState<GPhoto[]>([]);
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const [photoKey, setPhotoKey] = useState(0); // forces re-mount for fade animation
+  const PHOTO_INTERVAL = 15000; // 15 seconds per photo
+
   // Pixel shift to prevent screen burn-in
   const [pixelShift, setPixelShift] = useState({ x: 0, y: 0 });
   
@@ -180,6 +203,30 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
     const interval = setInterval(updateShift, SHIFT_INTERVAL);
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch Google Photos
+  useEffect(() => {
+    fetch('/api/photos')
+      .then(r => r.json())
+      .then(data => {
+        if (data.photos && data.photos.length > 0) {
+          setPhotos(data.photos);
+          setPhotoIndex(0);
+          setPhotoKey(k => k + 1);
+        }
+      })
+      .catch(err => console.warn('[IdleScreen] Could not fetch photos:', err));
+  }, []);
+
+  // Cycle through photos
+  useEffect(() => {
+    if (photos.length === 0) return;
+    const interval = setInterval(() => {
+      setPhotoIndex(i => (i + 1) % photos.length);
+      setPhotoKey(k => k + 1);
+    }, PHOTO_INTERVAL);
+    return () => clearInterval(interval);
+  }, [photos]);
 
   // Fetch data
   useEffect(() => {
@@ -283,6 +330,8 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
 
   const isNight = time.hour() >= 20 || time.hour() < 6;
 
+  const currentPhoto = photos.length > 0 ? photos[photoIndex] : null;
+
   return (
     <Box
       onClick={onWake}
@@ -296,10 +345,43 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
           ? 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)'
           : 'linear-gradient(135deg, #7c3aed 0%, #6366f1 25%, #3b82f6 50%, #06b6d4 75%, #10b981 100%)',
       }}
-      className="idle-gradient"
+      className={currentPhoto ? undefined : 'idle-gradient'}
     >
-      {/* Twinkling Stars (night) or Floating particles (day) */}
-      {stars.map(star => (
+      {/* Google Photos background slideshow */}
+      {currentPhoto && (
+        <Box
+          key={photoKey}
+          className="photo-fade-in"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <Box
+            className="photo-ken-burns"
+            style={{
+              position: 'absolute',
+              inset: '-5%', // slight overscan for ken-burns movement
+              backgroundImage: `url(${currentPhoto.url})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          />
+          {/* Dark overlay for readability */}
+          <Box
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0.55) 100%)',
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Twinkling Stars (night) or Floating particles (day) — only when no photo */}
+      {!currentPhoto && stars.map(star => (
         <Box
           key={star.id}
           className="star-twinkle"
@@ -310,14 +392,15 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
             width: star.size,
             height: star.size,
             borderRadius: '50%',
+            zIndex: 1,
             background: isNight ? 'white' : 'rgba(255,255,255,0.5)',
             animationDelay: `${star.delay}s`,
           }}
         />
       ))}
 
-      {/* Floating Emojis */}
-      {floatingEmojis.map(item => (
+      {/* Floating Emojis — only when no photo */}
+      {!currentPhoto && floatingEmojis.map(item => (
         <Text
           key={item.id}
           className="idle-float-slow"
@@ -327,6 +410,7 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
             top: `${item.y}%`,
             fontSize: `${item.size}rem`,
             opacity: 0.7,
+            zIndex: 1,
             animationDelay: `${item.delay}s`,
             animationDuration: `${item.duration}s`,
             filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))',
@@ -346,12 +430,13 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
           alignItems: 'center',
           justifyContent: 'center',
           padding: 40,
+          zIndex: 2,
           transform: `translate(${pixelShift.x}px, ${pixelShift.y}px)`,
           transition: 'transform 3s ease-in-out',
         }}
       >
-        {/* Animated Robot Mascot */}
-        <Box className="robot-body" style={{ marginBottom: 20 }}>
+        {/* Animated Robot Mascot — hidden during photo slideshow */}
+        <Box className="robot-body" style={{ marginBottom: 20, display: currentPhoto ? 'none' : undefined }}>
           <Box
             style={{
               width: 120,
@@ -518,6 +603,35 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
         >
           👆 Tap anywhere to wake up
         </Text>
+
+        {/* Photo slideshow indicator */}
+        {photos.length > 1 && (
+          <Box mt={16} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            {/* Progress dots */}
+            <Box style={{ display: 'flex', gap: 6 }}>
+              {photos.slice(0, Math.min(photos.length, 20)).map((_, i) => (
+                <Box
+                  key={i}
+                  style={{
+                    width: i === photoIndex % Math.min(photos.length, 20) ? 20 : 6,
+                    height: 6,
+                    borderRadius: 3,
+                    background: i === photoIndex % Math.min(photos.length, 20)
+                      ? 'rgba(255,255,255,0.95)'
+                      : 'rgba(255,255,255,0.3)',
+                    transition: 'all 0.4s ease',
+                  }}
+                />
+              ))}
+            </Box>
+            {/* Photo caption */}
+            {currentPhoto?.description && (
+              <Text c="white" size="xs" style={{ opacity: 0.6, textAlign: 'center', maxWidth: 400 }}>
+                {currentPhoto.description}
+              </Text>
+            )}
+          </Box>
+        )}
       </Box>
     </Box>
   );
