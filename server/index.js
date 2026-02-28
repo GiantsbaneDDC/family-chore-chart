@@ -3393,20 +3393,23 @@ app.get('/api/laundry/history/:type', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// Google Photos API
+// Google Drive Photos Slideshow
 // ─────────────────────────────────────────────
 
-// Simple in-memory cache
-let photosCache = { urls: [], fetchedAt: 0 };
+let photosCache = { photos: [], fetchedAt: 0 };
 const PHOTOS_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+let _driveAccessToken = null;
+let _driveTokenExpiry = 0;
 
-async function getGooglePhotosAccessToken() {
-  const clientId = process.env.GOOGLE_PHOTOS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_PHOTOS_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_PHOTOS_REFRESH_TOKEN;
+async function getDriveAccessToken() {
+  if (_driveAccessToken && Date.now() < _driveTokenExpiry - 60000) return _driveAccessToken;
+
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
 
   if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error('Google Photos not configured. Run: node server/setup-photos-auth.js');
+    throw new Error('Google OAuth not configured. Run: node server/setup-google-auth.js');
   }
 
   return new Promise((resolve, reject) => {
@@ -3421,16 +3424,15 @@ async function getGooglePhotosAccessToken() {
       hostname: 'oauth2.googleapis.com',
       path: '/token',
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': Buffer.byteLength(body),
-      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) },
     }, (res) => {
       let data = '';
       res.on('data', d => data += d);
       res.on('end', () => {
         const parsed = JSON.parse(data);
         if (parsed.error) return reject(new Error(parsed.error_description || parsed.error));
+        _driveAccessToken = parsed.access_token;
+        _driveTokenExpiry = Date.now() + (parsed.expires_in || 3600) * 1000;
         resolve(parsed.access_token);
       });
     });
@@ -3440,107 +3442,114 @@ async function getGooglePhotosAccessToken() {
   });
 }
 
-async function fetchGooglePhotos(accessToken) {
-  const albumId = process.env.GOOGLE_PHOTOS_ALBUM_ID;
-  const pageSize = 50;
+async function getDriveFolderPhotos(accessToken) {
+  const folderName = process.env.GOOGLE_DRIVE_FOLDER || 'Family Photos';
 
+  // Find the folder by name
   return new Promise((resolve, reject) => {
-    let path, body;
+    const query = encodeURIComponent(`mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`);
+    const req = https.request({
+      hostname: 'www.googleapis.com',
+      path: `/drive/v3/files?q=${query}&fields=files(id,name)`,
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }, (res) => {
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', () => {
+        const parsed = JSON.parse(data);
+        if (parsed.error) return reject(new Error(parsed.error.message));
+        if (!parsed.files || parsed.files.length === 0) {
+          return reject(new Error(`Drive folder "${folderName}" not found. Create it in Google Drive and add photos.`));
+        }
+        const folderId = parsed.files[0].id;
 
-    if (!albumId || albumId === '_all') {
-      // Fetch recent photos from library
-      path = `/v1/mediaItems?pageSize=${pageSize}&filters={}`;
-      const makeRequest = () => {
-        const req = https.request({
-          hostname: 'photoslibrary.googleapis.com',
-          path: `/v1/mediaItems?pageSize=${pageSize}`,
+        // List image files in folder
+        const imgQuery = encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/' and trashed=false`);
+        const req2 = https.request({
+          hostname: 'www.googleapis.com',
+          path: `/drive/v3/files?q=${imgQuery}&fields=files(id,name,description)&pageSize=100&orderBy=name`,
           method: 'GET',
           headers: { Authorization: `Bearer ${accessToken}` },
-        }, (res) => {
-          let data = '';
-          res.on('data', d => data += d);
-          res.on('end', () => {
-            const parsed = JSON.parse(data);
-            if (parsed.error) return reject(new Error(parsed.error.message));
-            const photos = (parsed.mediaItems || [])
-              .filter(item => item.mimeType && item.mimeType.startsWith('image/'))
-              .map(item => ({
-                id: item.id,
-                url: `${item.baseUrl}=w1920-h1080-c`, // crop-fill at 1920×1080
-                description: item.description || item.filename || '',
-              }));
+        }, (res2) => {
+          let data2 = '';
+          res2.on('data', d => data2 += d);
+          res2.on('end', () => {
+            const parsed2 = JSON.parse(data2);
+            if (parsed2.error) return reject(new Error(parsed2.error.message));
+            const photos = (parsed2.files || []).map(f => ({
+              id: f.id,
+              url: `/api/photos/proxy/${f.id}`,
+              description: f.description || '',
+            }));
             resolve(photos);
           });
         });
-        req.on('error', reject);
-        req.end();
-      };
-      makeRequest();
-    } else {
-      // Fetch photos from specific album
-      body = JSON.stringify({ albumId, pageSize });
-      const req = https.request({
-        hostname: 'photoslibrary.googleapis.com',
-        path: '/v1/mediaItems:search',
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body),
-        },
-      }, (res) => {
-        let data = '';
-        res.on('data', d => data += d);
-        res.on('end', () => {
-          const parsed = JSON.parse(data);
-          if (parsed.error) return reject(new Error(parsed.error.message));
-          const photos = (parsed.mediaItems || [])
-            .filter(item => item.mimeType && item.mimeType.startsWith('image/'))
-            .map(item => ({
-              id: item.id,
-              url: `${item.baseUrl}=w1920-h1080-c`,
-              description: item.description || item.filename || '',
-            }));
-          resolve(photos);
-        });
+        req2.on('error', reject);
+        req2.end();
       });
-      req.on('error', reject);
-      req.write(body);
-      req.end();
-    }
+    });
+    req.on('error', reject);
+    req.end();
   });
 }
 
 app.get('/api/photos', async (req, res) => {
   try {
     const now = Date.now();
-
-    // Return cached if still fresh
-    if (photosCache.urls.length > 0 && now - photosCache.fetchedAt < PHOTOS_CACHE_TTL) {
-      return res.json({ photos: photosCache.urls, cached: true });
+    if (photosCache.photos.length > 0 && now - photosCache.fetchedAt < PHOTOS_CACHE_TTL) {
+      return res.json({ photos: photosCache.photos, cached: true });
     }
 
-    const accessToken = await getGooglePhotosAccessToken();
-    const photos = await fetchGooglePhotos(accessToken);
+    const accessToken = await getDriveAccessToken();
+    const photos = await getDriveFolderPhotos(accessToken);
 
-    // Shuffle for variety
+    // Shuffle
     for (let i = photos.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [photos[i], photos[j]] = [photos[j], photos[i]];
     }
 
-    photosCache = { urls: photos, fetchedAt: now };
+    photosCache = { photos, fetchedAt: now };
     res.json({ photos });
   } catch (err) {
     console.error('[Photos API]', err.message);
-    // Return empty so the idle screen gracefully falls back to its default UI
     res.json({ photos: [], error: err.message });
   }
 });
 
-// Invalidate photo cache (e.g. after album change)
+// Proxy Drive images (keeps photos private, no auth needed client-side)
+app.get('/api/photos/proxy/:fileId', async (req, res) => {
+  try {
+    const accessToken = await getDriveAccessToken();
+    const { fileId } = req.params;
+
+    const driveReq = https.request({
+      hostname: 'www.googleapis.com',
+      path: `/drive/v3/files/${fileId}?alt=media`,
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }, (driveRes) => {
+      // Follow redirects
+      if (driveRes.statusCode === 302 || driveRes.statusCode === 301) {
+        res.redirect(driveRes.headers.location);
+        return;
+      }
+      res.setHeader('Content-Type', driveRes.headers['content-type'] || 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      driveRes.pipe(res);
+    });
+    driveReq.on('error', (err) => res.status(500).json({ error: err.message }));
+    driveReq.end();
+  } catch (err) {
+    console.error('[Photos Proxy]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Invalidate photo cache
 app.post('/api/photos/refresh', (req, res) => {
-  photosCache = { urls: [], fetchedAt: 0 };
+  photosCache = { photos: [], fetchedAt: 0 };
   res.json({ ok: true });
 });
 
