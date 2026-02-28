@@ -373,6 +373,7 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
   const currentDesc = photos[displayIndex]?.description || '';
 
   // Helper to render one photo layer
+  // Uses blurred cover bg + sharp contained image so nothing is cropped
   const renderLayer = (layer: { url: string; kenClass: string } | null, name: 'A' | 'B') => {
     if (!layer) return null;
     const isActive = activeLayer === name;
@@ -389,21 +390,34 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
           pointerEvents: 'none',
         }}
       >
+        {/* Blurred background — fills any empty space, no black bars */}
+        <Box
+          style={{
+            position: 'absolute',
+            inset: '-8%',
+            backgroundImage: `url(${layer.url})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            filter: 'blur(28px) brightness(0.45) saturate(1.2)',
+          }}
+        />
+        {/* Sharp full image — contain so nothing is cropped, with subtle Ken Burns */}
         <Box
           className={layer.kenClass}
           style={{
             position: 'absolute',
-            inset: '-6%',
+            inset: 0,
             backgroundImage: `url(${layer.url})`,
-            backgroundSize: 'cover',
+            backgroundSize: 'contain',
             backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
           }}
         />
-        {/* Gradient overlay for readability */}
+        {/* Gradient overlay for readability (lighter since contain shows more image) */}
         <Box style={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.5) 100%)',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.05) 40%, rgba(0,0,0,0.45) 100%)',
         }} />
       </Box>
     );
