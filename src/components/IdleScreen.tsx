@@ -495,6 +495,9 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
               transform: `translate(${pixelShift.x}px, ${pixelShift.y}px)`,
               transition: 'transform 3s ease-in-out',
               maxWidth: 420,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
             }}
           >
             {/* Time */}
