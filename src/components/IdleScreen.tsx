@@ -482,219 +482,270 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
         </Text>
       ))}
 
-      {/* Main Content - with pixel shift for burn-in prevention */}
-      <Box
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 40,
-          zIndex: 2,
-          transform: `translate(${pixelShift.x}px, ${pixelShift.y}px)`,
-          transition: 'transform 3s ease-in-out',
-        }}
-      >
-        {/* Animated Robot Mascot — hidden during photo slideshow */}
-        <Box className="robot-body" style={{ marginBottom: 20, display: hasPhotos ? 'none' : undefined }}>
+      {hasPhotos ? (
+        /* ── PHOTO MODE: compact widget top-left, photo fills screen ── */
+        <>
+          {/* Top-left info panel — pixel-shifted for burn-in prevention */}
           <Box
             style={{
-              width: 120,
-              height: 120,
-              borderRadius: '50%',
-              background: 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 10px 40px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.8)',
+              position: 'absolute',
+              top: 32,
+              left: 32,
+              zIndex: 2,
+              transform: `translate(${pixelShift.x}px, ${pixelShift.y}px)`,
+              transition: 'transform 3s ease-in-out',
             }}
           >
-            {/* Robot Face */}
-            <Box style={{ position: 'relative', width: 80, height: 80 }}>
-              {/* Eyes */}
-              <Box className="robot-eyes" style={{ position: 'absolute', top: 20, left: 10, width: 20, height: 20, borderRadius: '50%', background: '#7c3aed' }}>
-                <Box style={{ position: 'absolute', top: 4, left: 6, width: 6, height: 6, borderRadius: '50%', background: 'white' }} />
-              </Box>
-              <Box className="robot-eyes" style={{ position: 'absolute', top: 20, right: 10, width: 20, height: 20, borderRadius: '50%', background: '#7c3aed' }}>
-                <Box style={{ position: 'absolute', top: 4, left: 6, width: 6, height: 6, borderRadius: '50%', background: 'white' }} />
-              </Box>
-              {/* Smile */}
-              <Box style={{ position: 'absolute', bottom: 15, left: '50%', transform: 'translateX(-50%)', width: 30, height: 15, borderRadius: '0 0 15px 15px', background: '#7c3aed' }} />
-            </Box>
-          </Box>
-          {/* Antenna */}
-          <Box style={{ position: 'absolute', top: -15, left: '50%', transform: 'translateX(-50%)', width: 4, height: 20, background: '#94a3b8', borderRadius: 2 }}>
-            <Box className="idle-pulse" style={{ position: 'absolute', top: -8, left: -6, width: 16, height: 16, borderRadius: '50%', background: '#fbbf24' }} />
-          </Box>
-        </Box>
-
-        {/* Time Display */}
-        <Box className="idle-slide-in" style={{ textAlign: 'center', marginBottom: 30 }}>
-          <Title
-            order={1}
-            c="white"
-            style={{
-              fontSize: '8rem',
-              fontWeight: 900,
-              textShadow: '0 4px 20px rgba(0,0,0,0.3)',
-              letterSpacing: '-4px',
-              lineHeight: 1,
-            }}
-          >
-            {time.format('h:mm')}
-          </Title>
-          <Text
-            c="white"
-            size="xl"
-            fw={600}
-            style={{ opacity: 0.9, textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}
-          >
-            {time.format('dddd, MMMM D')}
-          </Text>
-        </Box>
-
-        {/* Info Cards */}
-        <Group gap="lg" className="idle-slide-in" style={{ animationDelay: '0.2s' }}>
-          {/* Weather */}
-          {weather && (
-            <Paper
-              p="lg"
-              radius="xl"
+            {/* Time */}
+            <Text
+              c="white"
               style={{
-                background: 'rgba(255,255,255,0.15)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.2)',
+                fontSize: '4rem',
+                fontWeight: 800,
+                lineHeight: 1,
+                letterSpacing: '-2px',
+                textShadow: '0 2px 12px rgba(0,0,0,0.6)',
               }}
             >
-              <Group gap="md">
-                <Group gap="sm">
-                  {getWeatherIcon()}
-                  <Box>
-                    <Text c="white" size="xl" fw={700}>{weather.temp}°</Text>
-                    <Text c="white" size="xs" style={{ opacity: 0.8 }}>
-                      H:{weather.high}° L:{weather.low}°
-                    </Text>
-                  </Box>
-                </Group>
+              {time.format('h:mm')}
+            </Text>
+            {/* Date */}
+            <Text
+              c="white"
+              fw={500}
+              size="md"
+              style={{ opacity: 0.85, textShadow: '0 1px 6px rgba(0,0,0,0.6)', marginBottom: 12 }}
+            >
+              {time.format('dddd, MMMM D')}
+            </Text>
+
+            {/* Weather row */}
+            {weather && (
+              <Box
+                style={{
+                  background: 'rgba(0,0,0,0.35)',
+                  backdropFilter: 'blur(12px)',
+                  borderRadius: 16,
+                  padding: '8px 14px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  marginBottom: 8,
+                  border: '1px solid rgba(255,255,255,0.12)',
+                }}
+              >
+                {getWeatherIcon(undefined, 24)}
+                <Text c="white" fw={700} size="lg">{weather.temp}°</Text>
+                <Text c="white" size="xs" style={{ opacity: 0.7 }}>H:{weather.high}° L:{weather.low}°</Text>
                 {forecast.length > 0 && (
-                  <Group gap="md" ml="md" pl="md" style={{ borderLeft: '1px solid rgba(255,255,255,0.3)' }}>
-                    {forecast.map((day) => (
-                      <Box key={day.day} ta="center">
-                        <Text c="white" size="xs" fw={600} style={{ opacity: 0.8 }}>{day.day}</Text>
-                        {getWeatherIcon(getConditionFromCode(day.code), 20)}
+                  <Box style={{ display: 'flex', gap: 10, marginLeft: 6, paddingLeft: 10, borderLeft: '1px solid rgba(255,255,255,0.2)' }}>
+                    {forecast.map(day => (
+                      <Box key={day.day} style={{ textAlign: 'center' }}>
+                        <Text c="white" size="xs" style={{ opacity: 0.7 }}>{day.day}</Text>
+                        {getWeatherIcon(getConditionFromCode(day.code), 16)}
                         <Text c="white" size="xs" fw={600}>{day.high}°</Text>
                       </Box>
                     ))}
-                  </Group>
+                  </Box>
                 )}
-              </Group>
-            </Paper>
-          )}
+              </Box>
+            )}
 
-          {/* Today's Dinner */}
-          {todayDinner && (
-            <Paper
-              p="lg"
-              radius="xl"
-              style={{
-                background: 'rgba(255,255,255,0.15)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.2)',
-              }}
-            >
-              <Group gap="sm">
-                <Text style={{ fontSize: '2rem' }}>{todayDinner.icon}</Text>
+            {/* Dinner */}
+            {todayDinner && (
+              <Box
+                style={{
+                  background: 'rgba(0,0,0,0.35)',
+                  backdropFilter: 'blur(12px)',
+                  borderRadius: 16,
+                  padding: '7px 14px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginBottom: 8,
+                  border: '1px solid rgba(255,255,255,0.12)',
+                }}
+              >
+                <Text style={{ fontSize: '1.2rem' }}>{todayDinner.icon}</Text>
                 <Box>
-                  <Text c="white" size="xs" style={{ opacity: 0.8 }}>Tonight's Dinner</Text>
-                  <Text c="white" fw={700}>{todayDinner.title}</Text>
+                  <Text c="white" size="xs" style={{ opacity: 0.7 }}>Tonight</Text>
+                  <Text c="white" size="sm" fw={600}>{todayDinner.title}</Text>
                 </Box>
-              </Group>
-            </Paper>
-          )}
+              </Box>
+            )}
 
-          {/* Next Event */}
-          {events.length > 0 && (
-            <Paper
-              p="lg"
-              radius="xl"
-              style={{
-                background: 'rgba(255,255,255,0.15)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.2)',
-              }}
-            >
-              <Group gap="sm">
-                <Text style={{ fontSize: '1.5rem' }}>📅</Text>
+            {/* Next event */}
+            {events.length > 0 && (
+              <Box
+                style={{
+                  background: 'rgba(0,0,0,0.35)',
+                  backdropFilter: 'blur(12px)',
+                  borderRadius: 16,
+                  padding: '7px 14px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  border: '1px solid rgba(255,255,255,0.12)',
+                }}
+              >
+                <Text style={{ fontSize: '1.1rem' }}>📅</Text>
                 <Box>
-                  <Text c="white" size="xs" style={{ opacity: 0.8 }}>
+                  <Text c="white" size="xs" style={{ opacity: 0.7 }}>
                     {events[0].allDay ? 'Today' : dayjs(events[0].start).format('h:mm A')}
                   </Text>
-                  <Text c="white" fw={700} lineClamp={1} maw={200}>{events[0].title}</Text>
+                  <Text c="white" size="sm" fw={600} style={{ maxWidth: 200 }} lineClamp={1}>{events[0].title}</Text>
                 </Box>
-              </Group>
-            </Paper>
-          )}
-        </Group>
-
-        {/* Bouncing Family Avatars */}
-        <Group gap="md" mt={50} className="idle-slide-in" style={{ animationDelay: '0.4s' }}>
-          {familyAvatars.map((avatar, i) => (
-            <Box
-              key={i}
-              className="idle-bounce"
-              style={{
-                animationDelay: `${i * 0.2}s`,
-                filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))',
-              }}
-            >
-              <Avatar avatar={avatar} size={64} />
-            </Box>
-          ))}
-        </Group>
-
-        {/* Tap to Wake */}
-        <Text
-          c="white"
-          size="lg"
-          fw={500}
-          mt={60}
-          className="idle-pulse"
-          style={{ opacity: 0.7 }}
-        >
-          👆 Tap anywhere to wake up
-        </Text>
-
-        {/* Photo slideshow indicator */}
-        {photos.length > 1 && (
-          <Box mt={16} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            {/* Progress dots — max 20 shown */}
-            <Box style={{ display: 'flex', gap: 6 }}>
-              {Array.from({ length: Math.min(photos.length, 20) }).map((_, i) => (
-                <Box
-                  key={i}
-                  style={{
-                    width: i === displayIndex % Math.min(photos.length, 20) ? 20 : 6,
-                    height: 6,
-                    borderRadius: 3,
-                    background: i === displayIndex % Math.min(photos.length, 20)
-                      ? 'rgba(255,255,255,0.95)'
-                      : 'rgba(255,255,255,0.3)',
-                    transition: 'all 0.4s ease',
-                  }}
-                />
-              ))}
-            </Box>
-            {/* Caption */}
-            {currentDesc && (
-              <Text c="white" size="xs" style={{ opacity: 0.6, textAlign: 'center', maxWidth: 400 }}>
-                {currentDesc}
-              </Text>
+              </Box>
             )}
           </Box>
-        )}
-      </Box>
+
+          {/* Bottom: tap hint + progress dots */}
+          <Box
+            style={{
+              position: 'absolute',
+              bottom: 28,
+              left: 0,
+              right: 0,
+              zIndex: 2,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 10,
+              transform: `translate(${pixelShift.x}px, 0px)`,
+              transition: 'transform 3s ease-in-out',
+            }}
+          >
+            {photos.length > 1 && (
+              <Box style={{ display: 'flex', gap: 6 }}>
+                {Array.from({ length: Math.min(photos.length, 20) }).map((_, i) => (
+                  <Box key={i} style={{
+                    width: i === displayIndex % Math.min(photos.length, 20) ? 20 : 6,
+                    height: 6, borderRadius: 3,
+                    background: i === displayIndex % Math.min(photos.length, 20)
+                      ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.25)',
+                    transition: 'all 0.4s ease',
+                  }} />
+                ))}
+              </Box>
+            )}
+            {currentDesc && (
+              <Text c="white" size="xs" style={{ opacity: 0.55, textAlign: 'center', maxWidth: 500 }}>{currentDesc}</Text>
+            )}
+            <Text c="white" size="sm" fw={500} className="idle-pulse" style={{ opacity: 0.5 }}>
+              Tap anywhere to wake
+            </Text>
+          </Box>
+        </>
+      ) : (
+        /* ── NO-PHOTO MODE: original centred layout ── */
+        <Box
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 40,
+            zIndex: 2,
+            transform: `translate(${pixelShift.x}px, ${pixelShift.y}px)`,
+            transition: 'transform 3s ease-in-out',
+          }}
+        >
+          {/* Robot Mascot */}
+          <Box className="robot-body" style={{ marginBottom: 20 }}>
+            <Box style={{ width: 120, height: 120, borderRadius: '50%', background: 'linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.8)' }}>
+              <Box style={{ position: 'relative', width: 80, height: 80 }}>
+                <Box className="robot-eyes" style={{ position: 'absolute', top: 20, left: 10, width: 20, height: 20, borderRadius: '50%', background: '#7c3aed' }}>
+                  <Box style={{ position: 'absolute', top: 4, left: 6, width: 6, height: 6, borderRadius: '50%', background: 'white' }} />
+                </Box>
+                <Box className="robot-eyes" style={{ position: 'absolute', top: 20, right: 10, width: 20, height: 20, borderRadius: '50%', background: '#7c3aed' }}>
+                  <Box style={{ position: 'absolute', top: 4, left: 6, width: 6, height: 6, borderRadius: '50%', background: 'white' }} />
+                </Box>
+                <Box style={{ position: 'absolute', bottom: 15, left: '50%', transform: 'translateX(-50%)', width: 30, height: 15, borderRadius: '0 0 15px 15px', background: '#7c3aed' }} />
+              </Box>
+            </Box>
+            <Box style={{ position: 'absolute', top: -15, left: '50%', transform: 'translateX(-50%)', width: 4, height: 20, background: '#94a3b8', borderRadius: 2 }}>
+              <Box className="idle-pulse" style={{ position: 'absolute', top: -8, left: -6, width: 16, height: 16, borderRadius: '50%', background: '#fbbf24' }} />
+            </Box>
+          </Box>
+
+          {/* Big Time */}
+          <Box className="idle-slide-in" style={{ textAlign: 'center', marginBottom: 30 }}>
+            <Title order={1} c="white" style={{ fontSize: '8rem', fontWeight: 900, textShadow: '0 4px 20px rgba(0,0,0,0.3)', letterSpacing: '-4px', lineHeight: 1 }}>
+              {time.format('h:mm')}
+            </Title>
+            <Text c="white" size="xl" fw={600} style={{ opacity: 0.9, textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>
+              {time.format('dddd, MMMM D')}
+            </Text>
+          </Box>
+
+          {/* Info Cards */}
+          <Group gap="lg" className="idle-slide-in" style={{ animationDelay: '0.2s' }}>
+            {weather && (
+              <Paper p="lg" radius="xl" style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}>
+                <Group gap="md">
+                  <Group gap="sm">
+                    {getWeatherIcon()}
+                    <Box>
+                      <Text c="white" size="xl" fw={700}>{weather.temp}°</Text>
+                      <Text c="white" size="xs" style={{ opacity: 0.8 }}>H:{weather.high}° L:{weather.low}°</Text>
+                    </Box>
+                  </Group>
+                  {forecast.length > 0 && (
+                    <Group gap="md" ml="md" pl="md" style={{ borderLeft: '1px solid rgba(255,255,255,0.3)' }}>
+                      {forecast.map(day => (
+                        <Box key={day.day} ta="center">
+                          <Text c="white" size="xs" fw={600} style={{ opacity: 0.8 }}>{day.day}</Text>
+                          {getWeatherIcon(getConditionFromCode(day.code), 20)}
+                          <Text c="white" size="xs" fw={600}>{day.high}°</Text>
+                        </Box>
+                      ))}
+                    </Group>
+                  )}
+                </Group>
+              </Paper>
+            )}
+            {todayDinner && (
+              <Paper p="lg" radius="xl" style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}>
+                <Group gap="sm">
+                  <Text style={{ fontSize: '2rem' }}>{todayDinner.icon}</Text>
+                  <Box>
+                    <Text c="white" size="xs" style={{ opacity: 0.8 }}>Tonight's Dinner</Text>
+                    <Text c="white" fw={700}>{todayDinner.title}</Text>
+                  </Box>
+                </Group>
+              </Paper>
+            )}
+            {events.length > 0 && (
+              <Paper p="lg" radius="xl" style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.2)' }}>
+                <Group gap="sm">
+                  <Text style={{ fontSize: '1.5rem' }}>📅</Text>
+                  <Box>
+                    <Text c="white" size="xs" style={{ opacity: 0.8 }}>
+                      {events[0].allDay ? 'Today' : dayjs(events[0].start).format('h:mm A')}
+                    </Text>
+                    <Text c="white" fw={700} lineClamp={1} maw={200}>{events[0].title}</Text>
+                  </Box>
+                </Group>
+              </Paper>
+            )}
+          </Group>
+
+          {/* Family Avatars */}
+          <Group gap="md" mt={50} className="idle-slide-in" style={{ animationDelay: '0.4s' }}>
+            {familyAvatars.map((avatar, i) => (
+              <Box key={i} className="idle-bounce" style={{ animationDelay: `${i * 0.2}s`, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))' }}>
+                <Avatar avatar={avatar} size={64} />
+              </Box>
+            ))}
+          </Group>
+
+          <Text c="white" size="lg" fw={500} mt={60} className="idle-pulse" style={{ opacity: 0.7 }}>
+            👆 Tap anywhere to wake up
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 }
