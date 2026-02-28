@@ -3442,15 +3442,12 @@ async function getDriveAccessToken() {
   });
 }
 
-async function getDriveFolderPhotos(accessToken) {
-  const folderName = process.env.GOOGLE_DRIVE_FOLDER || 'Family Photos';
-
-  // Find the folder by name
+async function getPhotosFromFolder(accessToken, folderId) {
   return new Promise((resolve, reject) => {
-    const query = encodeURIComponent(`mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`);
+    const imgQuery = encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/' and trashed=false`);
     const req = https.request({
       hostname: 'www.googleapis.com',
-      path: `/drive/v3/files?q=${query}&fields=files(id,name)`,
+      path: `/drive/v3/files?q=${imgQuery}&fields=files(id,name,description)&pageSize=200&orderBy=name`,
       method: 'GET',
       headers: { Authorization: `Bearer ${accessToken}` },
     }, (res) => {
@@ -3459,34 +3456,56 @@ async function getDriveFolderPhotos(accessToken) {
       res.on('end', () => {
         const parsed = JSON.parse(data);
         if (parsed.error) return reject(new Error(parsed.error.message));
-        if (!parsed.files || parsed.files.length === 0) {
-          return reject(new Error(`Drive folder "${folderName}" not found. Create it in Google Drive and add photos.`));
-        }
-        const folderId = parsed.files[0].id;
+        resolve((parsed.files || []).map(f => ({
+          id: f.id,
+          url: `/api/photos/proxy/${f.id}`,
+          description: f.description || '',
+        })));
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
 
-        // List image files in folder
-        const imgQuery = encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/' and trashed=false`);
-        const req2 = https.request({
-          hostname: 'www.googleapis.com',
-          path: `/drive/v3/files?q=${imgQuery}&fields=files(id,name,description)&pageSize=100&orderBy=name`,
-          method: 'GET',
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }, (res2) => {
-          let data2 = '';
-          res2.on('data', d => data2 += d);
-          res2.on('end', () => {
-            const parsed2 = JSON.parse(data2);
-            if (parsed2.error) return reject(new Error(parsed2.error.message));
-            const photos = (parsed2.files || []).map(f => ({
-              id: f.id,
-              url: `/api/photos/proxy/${f.id}`,
-              description: f.description || '',
-            }));
-            resolve(photos);
-          });
-        });
-        req2.on('error', reject);
-        req2.end();
+async function getDriveFolderPhotos(accessToken) {
+  // Folder names to include in the slideshow (comma-separated in env, or defaults)
+  const folderNames = (process.env.GOOGLE_DRIVE_FOLDERS || 'Family Photos,Wedding Album')
+    .split(',').map(s => s.trim()).filter(Boolean);
+
+  // Find all matching folders in one query
+  const nameFilter = folderNames.map(n => `name='${n}'`).join(' or ');
+  const query = encodeURIComponent(`mimeType='application/vnd.google-apps.folder' and (${nameFilter}) and trashed=false`);
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'www.googleapis.com',
+      path: `/drive/v3/files?q=${query}&fields=files(id,name)`,
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }, (res) => {
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', async () => {
+        const parsed = JSON.parse(data);
+        if (parsed.error) return reject(new Error(parsed.error.message));
+        const folders = parsed.files || [];
+        if (folders.length === 0) {
+          return reject(new Error(`No Drive folders found matching: ${folderNames.join(', ')}`));
+        }
+        console.log(`[Photos] Found folders: ${folders.map(f => f.name).join(', ')}`);
+
+        try {
+          const allPhotos = [];
+          for (const folder of folders) {
+            const photos = await getPhotosFromFolder(accessToken, folder.id);
+            console.log(`[Photos] ${photos.length} photos from "${folder.name}"`);
+            allPhotos.push(...photos);
+          }
+          resolve(allPhotos);
+        } catch (err) {
+          reject(err);
+        }
       });
     });
     req.on('error', reject);
