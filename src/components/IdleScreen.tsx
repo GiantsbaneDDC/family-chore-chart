@@ -413,11 +413,11 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
             backgroundRepeat: 'no-repeat',
           }}
         />
-        {/* Gradient overlay for readability (lighter since contain shows more image) */}
+        {/* Gradient overlay — stronger at top for widget readability */}
         <Box style={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.05) 40%, rgba(0,0,0,0.45) 100%)',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.1) 45%, rgba(0,0,0,0.5) 100%)',
         }} />
       </Box>
     );
@@ -483,155 +483,148 @@ export function IdleScreen({ onWake, familyAvatars = ['👦', '👧', '👨', '�
       ))}
 
       {hasPhotos ? (
-        /* ── PHOTO MODE: compact widget top-left, photo fills screen ── */
+        /* ── PHOTO MODE ── */
         <>
-          {/* Top-left info panel — pixel-shifted for burn-in prevention */}
+          {/* Top-left widget */}
           <Box
             style={{
               position: 'absolute',
-              top: 32,
-              left: 32,
+              top: 56,
+              left: 48,
               zIndex: 2,
               transform: `translate(${pixelShift.x}px, ${pixelShift.y}px)`,
               transition: 'transform 3s ease-in-out',
+              maxWidth: 420,
             }}
           >
             {/* Time */}
-            <Text
-              c="white"
-              style={{
-                fontSize: '4rem',
-                fontWeight: 800,
-                lineHeight: 1,
-                letterSpacing: '-2px',
-                textShadow: '0 2px 12px rgba(0,0,0,0.6)',
-              }}
-            >
+            <Text style={{
+              fontSize: '5.5rem',
+              fontWeight: 200,
+              lineHeight: 1,
+              letterSpacing: '-3px',
+              color: 'white',
+              textShadow: '0 2px 20px rgba(0,0,0,0.7), 0 0 40px rgba(0,0,0,0.4)',
+              marginBottom: 6,
+            }}>
               {time.format('h:mm')}
             </Text>
+
             {/* Date */}
-            <Text
-              c="white"
-              fw={500}
-              size="md"
-              style={{ opacity: 0.85, textShadow: '0 1px 6px rgba(0,0,0,0.6)', marginBottom: 12 }}
-            >
+            <Text style={{
+              fontSize: '1.15rem',
+              fontWeight: 400,
+              color: 'white',
+              opacity: 0.9,
+              textShadow: '0 1px 8px rgba(0,0,0,0.8)',
+              marginBottom: 20,
+              letterSpacing: '0.02em',
+            }}>
               {time.format('dddd, MMMM D')}
             </Text>
 
-            {/* Weather row */}
-            {weather && (
-              <Box
-                style={{
-                  background: 'rgba(0,0,0,0.35)',
-                  backdropFilter: 'blur(12px)',
-                  borderRadius: 16,
-                  padding: '8px 14px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  marginBottom: 8,
-                  border: '1px solid rgba(255,255,255,0.12)',
-                }}
-              >
-                {getWeatherIcon(undefined, 24)}
-                <Text c="white" fw={700} size="lg">{weather.temp}°</Text>
-                <Text c="white" size="xs" style={{ opacity: 0.7 }}>H:{weather.high}° L:{weather.low}°</Text>
-                {forecast.length > 0 && (
-                  <Box style={{ display: 'flex', gap: 10, marginLeft: 6, paddingLeft: 10, borderLeft: '1px solid rgba(255,255,255,0.2)' }}>
-                    {forecast.map(day => (
-                      <Box key={day.day} style={{ textAlign: 'center' }}>
-                        <Text c="white" size="xs" style={{ opacity: 0.7 }}>{day.day}</Text>
-                        {getWeatherIcon(getConditionFromCode(day.code), 16)}
-                        <Text c="white" size="xs" fw={600}>{day.high}°</Text>
-                      </Box>
-                    ))}
-                  </Box>
-                )}
-              </Box>
-            )}
-
-            {/* Dinner */}
-            {todayDinner && (
-              <Box
-                style={{
-                  background: 'rgba(0,0,0,0.35)',
-                  backdropFilter: 'blur(12px)',
-                  borderRadius: 16,
-                  padding: '7px 14px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  marginBottom: 8,
-                  border: '1px solid rgba(255,255,255,0.12)',
-                }}
-              >
-                <Text style={{ fontSize: '1.2rem' }}>{todayDinner.icon}</Text>
-                <Box>
-                  <Text c="white" size="xs" style={{ opacity: 0.7 }}>Tonight</Text>
-                  <Text c="white" size="sm" fw={600}>{todayDinner.title}</Text>
-                </Box>
-              </Box>
-            )}
-
-            {/* Next event */}
-            {events.length > 0 && (
-              <Box
-                style={{
-                  background: 'rgba(0,0,0,0.35)',
-                  backdropFilter: 'blur(12px)',
-                  borderRadius: 16,
-                  padding: '7px 14px',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  border: '1px solid rgba(255,255,255,0.12)',
-                }}
-              >
-                <Text style={{ fontSize: '1.1rem' }}>📅</Text>
-                <Box>
-                  <Text c="white" size="xs" style={{ opacity: 0.7 }}>
-                    {events[0].allDay ? 'Today' : dayjs(events[0].start).format('h:mm A')}
-                  </Text>
-                  <Text c="white" size="sm" fw={600} style={{ maxWidth: 200 }} lineClamp={1}>{events[0].title}</Text>
-                </Box>
-              </Box>
-            )}
-          </Box>
-
-          {/* Bottom: tap hint + progress dots */}
-          <Box
-            style={{
-              position: 'absolute',
-              bottom: 28,
-              left: 0,
-              right: 0,
-              zIndex: 2,
+            {/* Info panel — single frosted card */}
+            <Box style={{
+              background: 'rgba(0,0,0,0.38)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              borderRadius: 20,
+              padding: '16px 20px',
+              border: '1px solid rgba(255,255,255,0.1)',
               display: 'flex',
               flexDirection: 'column',
-              alignItems: 'center',
-              gap: 10,
-              transform: `translate(${pixelShift.x}px, 0px)`,
-              transition: 'transform 3s ease-in-out',
-            }}
-          >
+              gap: 12,
+            }}>
+              {/* Weather row */}
+              {weather && (
+                <Box style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {getWeatherIcon(undefined, 28)}
+                  <Box>
+                    <Text style={{ color: 'white', fontSize: '1.5rem', fontWeight: 600, lineHeight: 1 }}>
+                      {weather.temp}°
+                    </Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.75rem' }}>
+                      H:{weather.high}° · L:{weather.low}°
+                    </Text>
+                  </Box>
+                  {forecast.length > 0 && (
+                    <Box style={{ display: 'flex', gap: 14, marginLeft: 8, paddingLeft: 14, borderLeft: '1px solid rgba(255,255,255,0.18)' }}>
+                      {forecast.map(day => (
+                        <Box key={day.day} style={{ textAlign: 'center' }}>
+                          <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem', marginBottom: 2 }}>{day.day}</Text>
+                          {getWeatherIcon(getConditionFromCode(day.code), 18)}
+                          <Text style={{ color: 'white', fontSize: '0.75rem', fontWeight: 600 }}>{day.high}°</Text>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              )}
+
+              {/* Divider if we have extra info */}
+              {(todayDinner || events.length > 0) && weather && (
+                <Box style={{ height: 1, background: 'rgba(255,255,255,0.12)' }} />
+              )}
+
+              {/* Dinner */}
+              {todayDinner && (
+                <Box style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Text style={{ fontSize: '1.3rem', lineHeight: 1 }}>{todayDinner.icon}</Text>
+                  <Box>
+                    <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tonight</Text>
+                    <Text style={{ color: 'white', fontSize: '0.9rem', fontWeight: 500 }}>{todayDinner.title}</Text>
+                  </Box>
+                </Box>
+              )}
+
+              {/* Next event */}
+              {events.length > 0 && (
+                <Box style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Text style={{ fontSize: '1.2rem', lineHeight: 1 }}>📅</Text>
+                  <Box>
+                    <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      {events[0].allDay ? 'Today' : dayjs(events[0].start).format('h:mm A')}
+                    </Text>
+                    <Text style={{ color: 'white', fontSize: '0.9rem', fontWeight: 500, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {events[0].title}
+                    </Text>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          </Box>
+
+          {/* Bottom bar — progress dots + tap hint */}
+          <Box style={{
+            position: 'absolute',
+            bottom: 32,
+            left: 0,
+            right: 0,
+            zIndex: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 8,
+            transform: `translateX(${pixelShift.x}px)`,
+            transition: 'transform 3s ease-in-out',
+          }}>
             {photos.length > 1 && (
-              <Box style={{ display: 'flex', gap: 6 }}>
+              <Box style={{ display: 'flex', gap: 5 }}>
                 {Array.from({ length: Math.min(photos.length, 20) }).map((_, i) => (
                   <Box key={i} style={{
-                    width: i === displayIndex % Math.min(photos.length, 20) ? 20 : 6,
-                    height: 6, borderRadius: 3,
+                    width: i === displayIndex % Math.min(photos.length, 20) ? 18 : 5,
+                    height: 5, borderRadius: 3,
                     background: i === displayIndex % Math.min(photos.length, 20)
-                      ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.25)',
+                      ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.22)',
                     transition: 'all 0.4s ease',
                   }} />
                 ))}
               </Box>
             )}
             {currentDesc && (
-              <Text c="white" size="xs" style={{ opacity: 0.55, textAlign: 'center', maxWidth: 500 }}>{currentDesc}</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', textAlign: 'center', maxWidth: 480 }}>{currentDesc}</Text>
             )}
-            <Text c="white" size="sm" fw={500} className="idle-pulse" style={{ opacity: 0.5 }}>
+            <Text className="idle-pulse" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>
               Tap anywhere to wake
             </Text>
           </Box>
